@@ -1,9 +1,9 @@
-from setuptools import setup
+from setuptools import setup,find_packages
 
 setup(
     name='LJ_surrogates',
     version='',
-    packages=[''],
+    packages=find_packages(),
     url='https://github.com/ocmadin/LJ_surrogates',
     license='',
     author='owenmadin',
