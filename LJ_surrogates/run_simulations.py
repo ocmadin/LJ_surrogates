@@ -44,7 +44,7 @@ def estimate_forcefield_properties(property_dataset, forcefield, output_director
     # Define the set of commands which will set up the correct environment
     # for each of the workers.
     setup_script_commands = [
-        'module load cuda/9.2',
+        'module load cuda/11.2',
     ]
 
     # Define extra options to only run on certain node groups
