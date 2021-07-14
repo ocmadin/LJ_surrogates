@@ -11,7 +11,7 @@ from openff.evaluator.server import EvaluatorServer
 from openff.evaluator.client import EvaluatorClient
 import os
 
-def estimate_forcefield_properties(property_dataset, forcefield, output_directory):
+def estimate_forcefield_properties(property_dataset, forcefield):
     warnings.filterwarnings('ignore')
     logging.getLogger("openforcefield").setLevel(logging.ERROR)
 
@@ -44,7 +44,7 @@ def estimate_forcefield_properties(property_dataset, forcefield, output_director
     # Define the set of commands which will set up the correct environment
     # for each of the workers.
     setup_script_commands = [
-        'module load cuda/11.2',
+        'module load cuda/10.1',
     ]
 
     # Define extra options to only run on certain node groups
@@ -83,5 +83,5 @@ def estimate_forcefield_properties(property_dataset, forcefield, output_director
     results, exception = request.results(synchronous=True, polling_interval=30)
     assert exception is None
 
-    results.estimated_properties.json(os.path.join(output_directory,"estimated_data_set.json"), format=True)
+    results.estimated_properties.json(("estimated_data_set.json"), format=True)
 

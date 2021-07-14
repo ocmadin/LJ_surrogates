@@ -1,10 +1,10 @@
-from LJ_surrogates.parameter_modification import vary_parameters_lhc
+from LJ_surrogates.LJ_surrogates.parameter_modification import vary_parameters_lhc
 import os
 import pandas
 from openff.evaluator.datasets import PhysicalPropertyDataSet
 import shutil
 forcefield = 'openff-1-3-0.offxml'
-num_samples = 2
+num_samples = 4
 output_directory = 'modified_force_fields'
 data_filepath = 'alcohol_alkane_datapoints_test.csv'
 data_csv = pandas.read_csv(data_filepath)
