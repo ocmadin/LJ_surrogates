@@ -6,7 +6,7 @@ from openff.evaluator.forcefield import SmirnoffForceFieldSource
 from openff.evaluator.properties import Density, EnthalpyOfMixing
 from openff.evaluator.client import RequestOptions
 from openff.evaluator.backends import ComputeResources
-from openff.evaluator.backends.dask import DaskLocalCluster
+from openff.evaluator.backends.dask import DaskLSFBackend,QueueWorkerResources
 from openff.evaluator.server import EvaluatorServer
 from openff.evaluator.client import EvaluatorClient
 import os
@@ -36,17 +36,38 @@ def estimate_forcefield_properties(property_dataset, forcefield, output_director
     estimation_options.add_schema("SimulationLayer", "EnthalpyOfMixing", h_mix_schema)
 
 
-    calculation_backend = DaskLocalCluster(
-        number_of_workers=1,
-        resources_per_worker=ComputeResources(
-            number_of_threads=1,
-            number_of_gpus=0,
-        ),
-    )
-    calculation_backend.start()
+    resources = QueueWorkerResources(number_of_threads=1,
+                                     number_of_gpus=1,
+                                     preferred_gpu_toolkit=QueueWorkerResources.GPUToolkit.CUDA,
+                                     wallclock_time_limit='05:00')
+
+    # Define the set of commands which will set up the correct environment
+    # for each of the workers.
+    setup_script_commands = [
+        'module load cuda/9.2',
+    ]
+
+    # Define extra options to only run on certain node groups
+    extra_script_options = [
+        '-m "ls-gpu lt-gpu"'
+    ]
+
+    # Create the backend which will adaptively try to spin up between one and
+    # ten workers with the requested resources depending on the calculation load.
 
 
-    evaluator_server = EvaluatorServer(calculation_backend=calculation_backend)
+    from openff.evaluator.backends.dask import DaskLSFBackend
+
+    lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
+                                 maximum_number_of_workers=10,
+                                 resources_per_worker=resources,
+                                 queue_name='gpuqueue',
+                                 setup_script_commands=setup_script_commands,
+                                 extra_script_options=extra_script_options)
+    lsf_backend.start()
+
+
+    evaluator_server = EvaluatorServer(calculation_backend=lsf_backend)
     evaluator_server.start(asynchronous=True)
     evaluator_client = EvaluatorClient()
 
