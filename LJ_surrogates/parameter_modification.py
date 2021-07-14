@@ -30,7 +30,7 @@ def vary_parameters_lhc(filename, num_samples, output_directory):
                 lj.epsilon *= reshape_values[counter, 0]
                 lj.rmin_half *= reshape_values[counter, 1]
                 counter += 1
-        os.makedirs(os.path.join(output_directory,str(i)))
-        ff_name = 'openff-1-3-0-LHS-modified.offxml'
-        forcefield.to_file(os.path.join(output_directory, str(i),ff_name))
+        os.makedirs(os.path.join(output_directory,str(i+1)))
+        ff_name = 'force-field.offxml'
+        forcefield.to_file(os.path.join(output_directory, str(i+1),ff_name))
 
