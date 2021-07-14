@@ -1,4 +1,4 @@
-from LJ_surrogates.parameter_modification import vary_parameters_lhc
+from LJ_surrogates.LJ_surrogates.parameter_modification import vary_parameters_lhc
 import os
 import pandas
 from openff.evaluator.datasets import PhysicalPropertyDataSet
