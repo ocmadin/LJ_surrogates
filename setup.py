@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='LJ_surrogate_modeling',
+    name='LJ_surrogates',
     version='',
     packages=[''],
     url='https://github.com/ocmadin/LJ_surrogates',
