@@ -6,7 +6,7 @@ from openff.evaluator.forcefield import SmirnoffForceFieldSource
 from openff.evaluator.properties import Density, EnthalpyOfMixing
 from openff.evaluator.client import RequestOptions
 from openff.evaluator.client import EvaluatorClient
-from openff.evaluator.backends import ComputeResources
+from openff.evaluator.backends import QueueWorkerResources
 from openff.evaluator.backends.dask import DaskLSFBackend
 from openff.evaluator.server import EvaluatorServer
 from openff.evaluator.utils import setup_timestamp_logging
@@ -45,12 +45,12 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker):
 
     # Set up a backend to run the calculations on with the requested resources.
     if gpus_per_worker <= 0:
-        worker_resources = ComputeResources(number_of_threads=cpus_per_worker)
+        worker_resources = QueueWorkerResources(number_of_threads=cpus_per_worker)
     else:
-        worker_resources = ComputeResources(
+        worker_resources = QueueWorkerResources(
             number_of_threads=cpus_per_worker,
             number_of_gpus=gpus_per_worker,
-            preferred_gpu_toolkit=ComputeResources.GPUToolkit.CUDA,
+            preferred_gpu_toolkit=QueueWorkerResources.GPUToolkit.CUDA,
         )
 
     # Define the set of commands which will set up the correct environment
