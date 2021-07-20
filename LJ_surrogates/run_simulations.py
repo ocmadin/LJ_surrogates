@@ -10,6 +10,7 @@ from openff.evaluator.backends.dask import DaskLSFBackend,QueueWorkerResources
 from openff.evaluator.server import EvaluatorServer
 from openff.evaluator.client import EvaluatorClient
 import os
+import numpy as np
 
 def estimate_forcefield_properties(property_dataset, forcefield):
     warnings.filterwarnings('ignore')
@@ -44,7 +45,7 @@ def estimate_forcefield_properties(property_dataset, forcefield):
     # Define the set of commands which will set up the correct environment
     # for each of the workers.
     setup_script_commands = [
-        'module load cuda/10.1',
+        'module load cuda/10.1', 'conda activate LJ_surrogates'
     ]
 
     # Define extra options to only run on certain node groups
@@ -59,14 +60,14 @@ def estimate_forcefield_properties(property_dataset, forcefield):
     from openff.evaluator.backends.dask import DaskLSFBackend
 
     lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
-                                 maximum_number_of_workers=10,
+                                 maximum_number_of_workers=5,
                                  resources_per_worker=resources,
                                  queue_name='gpuqueue',
                                  setup_script_commands=setup_script_commands,
                                  extra_script_options=extra_script_options)
     lsf_backend.start()
 
-
+    #Add random noise so that ports don't get overwhelmed
     evaluator_server = EvaluatorServer(calculation_backend=lsf_backend)
     evaluator_server.start(asynchronous=True)
     evaluator_client = EvaluatorClient()
