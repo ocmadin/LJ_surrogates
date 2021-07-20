@@ -12,7 +12,7 @@ from openff.evaluator.server import EvaluatorServer
 from openff.evaluator.utils import setup_timestamp_logging
 import os
 import numpy as np
-
+import shutil
 
 def run_server(n_workers, cpus_per_worker, gpus_per_worker):
 
@@ -40,7 +40,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker):
     working_directory = "working_directory"
 
     # Remove any existing data.
-    if path.isdir(working_directory):
+    if os.path.isdir(working_directory):
         shutil.rmtree(working_directory)
 
     # Set up a backend to run the calculations on with the requested resources.
@@ -84,6 +84,8 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker):
             calculation_backend=lsf_backend,
             working_directory=working_directory,
             port=8000,
+            enable_data_caching=False,
+            delete_working_files=True
         )
 
         # Tell the server to start listening for estimation requests.
