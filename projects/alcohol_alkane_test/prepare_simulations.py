@@ -20,3 +20,4 @@ for folder in os.listdir(output_directory):
     shutil.copy2('server-config.json', os.path.join(output_directory, folder))
     shutil.copy2('estimation-options.json', os.path.join(output_directory, folder))
     shutil.copy2('submit.sh', os.path.join(output_directory, folder))
+    shutil.copy2('benchmark.json', os.path.join(output_directory,folder))

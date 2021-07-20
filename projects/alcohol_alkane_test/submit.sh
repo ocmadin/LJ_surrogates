@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Set the job name and wall time / memory limit
-#BSUB -J optim
+#BSUB -J eval
 #BSUB -W 168:00
 #BSUB -M 8
 #
@@ -20,5 +20,3 @@ conda env export > conda_env.yaml
 
 # Run the commands
 nonbonded benchmark run --config server-config.json
-
-nonbonded benchmark analyze
