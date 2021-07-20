@@ -16,11 +16,8 @@ def main(n_samples, output_directory, forcefield, data_filepath):
 
     for folder in os.listdir(output_directory):
         shutil.copy2('test-set-collection.json', os.path.join(output_directory, folder))
-        shutil.copy2('server-config.json', os.path.join(output_directory, folder))
-        shutil.copy2('estimation-options.json', os.path.join(output_directory, folder))
         shutil.copy2('submit.sh', os.path.join(output_directory, folder))
-        shutil.copy2('benchmark.json', os.path.join(output_directory, folder))
-
+        shutil.copy2('basic_run.py',os.path.join(output_directory, folder))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

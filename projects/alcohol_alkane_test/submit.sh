@@ -19,4 +19,4 @@ conda activate LJ_surrogates
 conda env export > conda_env.yaml
 
 # Run the commands
-nonbonded benchmark run --config server-config.json
+python basic_run.py

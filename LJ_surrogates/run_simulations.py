@@ -70,7 +70,6 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker):
                                  queue_name='gpuqueue',
                                  setup_script_commands=setup_script_commands,
                                  extra_script_options=extra_script_options)
-    lsf_backend.start()
 
     # Create an estimation server which will run the calculations.
     logger.info(
