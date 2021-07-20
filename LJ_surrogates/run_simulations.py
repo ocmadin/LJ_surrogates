@@ -5,12 +5,89 @@ from openff.evaluator.datasets import PhysicalPropertyDataSet
 from openff.evaluator.forcefield import SmirnoffForceFieldSource
 from openff.evaluator.properties import Density, EnthalpyOfMixing
 from openff.evaluator.client import RequestOptions
-from openff.evaluator.backends import ComputeResources
-from openff.evaluator.backends.dask import DaskLSFBackend,QueueWorkerResources
-from openff.evaluator.server import EvaluatorServer
 from openff.evaluator.client import EvaluatorClient
+from openff.evaluator.backends import ComputeResources
+from openff.evaluator.backends.dask import DaskLSFBackend
+from openff.evaluator.server import EvaluatorServer
+from openff.evaluator.utils import setup_timestamp_logging
 import os
 import numpy as np
+
+
+def run_server(n_workers, cpus_per_worker, gpus_per_worker):
+
+    if n_workers <= 0:
+        raise ValueError("The number of workers must be greater than 0")
+    if cpus_per_worker <= 0:
+        raise ValueError("The number of CPU's per worker must be greater than 0")
+    if gpus_per_worker < 0:
+
+        raise ValueError(
+            "The number of GPU's per worker must be greater than or equal to 0"
+        )
+    if 0 < gpus_per_worker != cpus_per_worker:
+
+        raise ValueError(
+            "The number of GPU's per worker must match the number of "
+            "CPU's per worker."
+        )
+
+    # Set up logging for the evaluator.
+    setup_timestamp_logging()
+    logger = logging.getLogger()
+
+    # Set up the directory structure.
+    working_directory = "working_directory"
+
+    # Remove any existing data.
+    if path.isdir(working_directory):
+        shutil.rmtree(working_directory)
+
+    # Set up a backend to run the calculations on with the requested resources.
+    if gpus_per_worker <= 0:
+        worker_resources = ComputeResources(number_of_threads=cpus_per_worker)
+    else:
+        worker_resources = ComputeResources(
+            number_of_threads=cpus_per_worker,
+            number_of_gpus=gpus_per_worker,
+            preferred_gpu_toolkit=ComputeResources.GPUToolkit.CUDA,
+        )
+
+    # Define the set of commands which will set up the correct environment
+    # for each of the workers.
+    setup_script_commands = [
+        'module load cuda/10.1', 'conda activate LJ_surrogates'
+    ]
+
+    # Define extra options to only run on certain node groups
+    extra_script_options = [
+        '-m "ls-gpu lt-gpu"'
+    ]
+
+    lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
+                                 maximum_number_of_workers=5,
+                                 resources_per_worker=worker_resources,
+                                 queue_name='gpuqueue',
+                                 setup_script_commands=setup_script_commands,
+                                 extra_script_options=extra_script_options)
+    lsf_backend.start()
+
+    # Create an estimation server which will run the calculations.
+    logger.info(
+        f"Starting the server with {n_workers} workers, each with "
+        f"{cpus_per_worker} CPUs and {gpus_per_worker} GPUs."
+    )
+
+    with lsf_backend:
+
+        server = EvaluatorServer(
+            calculation_backend=lsf_backend,
+            working_directory=working_directory,
+            port=8000,
+        )
+
+        # Tell the server to start listening for estimation requests.
+        server.start()
 
 def estimate_forcefield_properties(property_dataset, forcefield):
     warnings.filterwarnings('ignore')
@@ -36,40 +113,6 @@ def estimate_forcefield_properties(property_dataset, forcefield):
     estimation_options.add_schema("SimulationLayer", "Density", density_schema)
     estimation_options.add_schema("SimulationLayer", "EnthalpyOfMixing", h_mix_schema)
 
-
-    resources = QueueWorkerResources(number_of_threads=1,
-                                     number_of_gpus=1,
-                                     preferred_gpu_toolkit=QueueWorkerResources.GPUToolkit.CUDA,
-                                     wallclock_time_limit='05:00')
-
-    # Define the set of commands which will set up the correct environment
-    # for each of the workers.
-    setup_script_commands = [
-        'module load cuda/10.1', 'conda activate LJ_surrogates'
-    ]
-
-    # Define extra options to only run on certain node groups
-    extra_script_options = [
-        '-m "ls-gpu lt-gpu"'
-    ]
-
-    # Create the backend which will adaptively try to spin up between one and
-    # ten workers with the requested resources depending on the calculation load.
-
-
-    from openff.evaluator.backends.dask import DaskLSFBackend
-
-    lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
-                                 maximum_number_of_workers=5,
-                                 resources_per_worker=resources,
-                                 queue_name='gpuqueue',
-                                 setup_script_commands=setup_script_commands,
-                                 extra_script_options=extra_script_options)
-    lsf_backend.start()
-
-    #Add random noise so that ports don't get overwhelmed
-    evaluator_server = EvaluatorServer(calculation_backend=lsf_backend)
-    evaluator_server.start(asynchronous=True)
     evaluator_client = EvaluatorClient()
 
     request, exception = evaluator_client.request_estimate(
