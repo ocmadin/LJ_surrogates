@@ -13,20 +13,18 @@ from openff.evaluator.utils import setup_timestamp_logging
 import os
 import numpy as np
 import shutil
+import time
 
-def run_server(n_workers, cpus_per_worker, gpus_per_worker):
-
+def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
     if n_workers <= 0:
         raise ValueError("The number of workers must be greater than 0")
     if cpus_per_worker <= 0:
         raise ValueError("The number of CPU's per worker must be greater than 0")
     if gpus_per_worker < 0:
-
         raise ValueError(
             "The number of GPU's per worker must be greater than or equal to 0"
         )
     if 0 < gpus_per_worker != cpus_per_worker:
-
         raise ValueError(
             "The number of GPU's per worker must match the number of "
             "CPU's per worker."
@@ -79,16 +77,25 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker):
 
     with lsf_backend:
 
-        server = EvaluatorServer(
-            calculation_backend=lsf_backend,
-            working_directory=working_directory,
-            port=8000,
-            enable_data_caching=False,
-            delete_working_files=True
-        )
+        with EvaluatorServer(calculation_backend=lsf_backend,
+                             working_directory=working_directory,
+                             port=8000,
+                             enable_data_caching=False,
+                             delete_working_files=True) as server:
+            results = []
+            for subdirectory in os.listdir(files_directory):
+                forcefield = SmirnoffForceFieldSource.from_path(
+                    os.path.join(files_directory, subdirectory, 'force-field.offxml'))
+                property_dataset = PhysicalPropertyDataSet.from_json(
+                    os.path.join(files_directory, subdirectory, 'test-set-collection.json'))
+                results.append(estimate_forcefield_properties(property_dataset,forcefield))
 
-        # Tell the server to start listening for estimation requests.
-        server.start()
+            while all(len(result.exceptions) >= 0 for result in results):
+                time.sleep(30)
+
+    return results
+
+
 
 def estimate_forcefield_properties(property_dataset, forcefield):
     warnings.filterwarnings('ignore')
@@ -96,14 +103,12 @@ def estimate_forcefield_properties(property_dataset, forcefield):
 
     setup_timestamp_logging()
 
-
     data_set = property_dataset
 
     force_field_source = forcefield
 
     density_schema = Density.default_simulation_schema(n_molecules=1000)
     h_mix_schema = EnthalpyOfMixing.default_simulation_schema(n_molecules=1000)
-
 
     # Create an options object which defines how the data set should be estimated.
     estimation_options = RequestOptions()
@@ -121,12 +126,6 @@ def estimate_forcefield_properties(property_dataset, forcefield):
         force_field_source=force_field_source,
         options=estimation_options,
     )
+    results = request.results(synchronous=True, polling_interval=30)
 
-    assert exception is None
-
-    # Wait for the results.
-    results, exception = request.results(synchronous=True, polling_interval=30)
-    assert exception is None
-
-    results.estimated_properties.json(("estimated_data_set.json"), format=True)
-
+    return results
