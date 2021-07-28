@@ -8,14 +8,6 @@ python prepare_simulations.py -n $number_of_replicates -o 'modified_force_fields
 
 cd run_server
 bsub < server-submit.sh
-sleep 120
-cd ..
 
-for i in $(seq 1 $number_of_replicates)
-do
-   cd modified_force_fields/$i
-   bsub < submit.sh
-   sleep 10
-   cd ../..
-done
+
 
