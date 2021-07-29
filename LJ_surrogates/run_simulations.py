@@ -81,17 +81,23 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
                              working_directory=working_directory,
                              port=8000,
                              enable_data_caching=False,
-                             delete_working_files=True) as server:
-            results = []
+                             delete_working_files=True):
+
+            requests = []
+
             for subdirectory in os.listdir(files_directory):
+
                 forcefield = SmirnoffForceFieldSource.from_path(
                     os.path.join(files_directory, subdirectory, 'force-field.offxml'))
                 property_dataset = PhysicalPropertyDataSet.from_json(
                     os.path.join(files_directory, subdirectory, 'test-set-collection.json'))
-                results.append(estimate_forcefield_properties(property_dataset,forcefield))
 
-            while all(len(result.exceptions) >= 0 for result in results):
-                time.sleep(30)
+                requests.append(estimate_forcefield_properties(property_dataset,forcefield))
+
+            results = [
+                request.results(synchronous=True, polling_interval=30)[0]
+                for request in requests
+            ]
 
     return results
 
@@ -121,11 +127,10 @@ def estimate_forcefield_properties(property_dataset, forcefield):
 
     evaluator_client = EvaluatorClient()
 
-    request, exception = evaluator_client.request_estimate(
+    request, _ = evaluator_client.request_estimate(
         property_set=data_set,
         force_field_source=force_field_source,
         options=estimation_options,
     )
-    results = request.results(synchronous=True, polling_interval=30)
 
-    return results
+    return request
