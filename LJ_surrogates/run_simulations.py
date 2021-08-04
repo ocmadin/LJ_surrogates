@@ -84,6 +84,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
                              delete_working_files=True):
 
             requests = []
+            forcefields = []
 
             for subdirectory in os.listdir(files_directory):
 
@@ -93,13 +94,13 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
                     os.path.join(files_directory, subdirectory, 'test-set-collection.json'))
 
                 requests.append(estimate_forcefield_properties(property_dataset,forcefield))
-
+                forcefields.append(forcefield)
             results = [
                 request.results(synchronous=True, polling_interval=30)[0]
                 for request in requests
             ]
 
-    return results
+    return results, forcefields
 
 
 
