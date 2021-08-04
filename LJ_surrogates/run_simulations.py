@@ -63,7 +63,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
     ]
 
     lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
-                                 maximum_number_of_workers=5,
+                                 maximum_number_of_workers=50,
                                  resources_per_worker=worker_resources,
                                  queue_name='gpuqueue',
                                  setup_script_commands=setup_script_commands,

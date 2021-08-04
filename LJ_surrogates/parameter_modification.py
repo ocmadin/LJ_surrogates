@@ -13,7 +13,7 @@ def vary_parameters_lhc(filename, num_samples, output_directory):
 
     smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]', '[#8X2H1+0:1]', '[#1:1]-[#8]']
 
-    param_range = np.asarray([0.75, 1.25])
+    param_range = np.asarray([0.95, 1.05])
     n_dim = len(smirks_types_to_change) * 2
     lj_sample_ranges = []
     for i in range(n_dim):

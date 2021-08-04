@@ -9,7 +9,7 @@ def main(n_workers, cpus_per_worker, gpus_per_worker,ff_directory):
     os.makedirs('estimated_results', exist_ok=True)
     for i, result in enumerate(results):
         result.estimated_properties.json(
-            (os.path.join('estimated_results', "estimated_data_set_" + i + '.json')), format = True)
+            (os.path.join('estimated_results', "estimated_data_set_" + str(i) + '.json')), format = True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
