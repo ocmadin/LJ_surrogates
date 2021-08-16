@@ -7,7 +7,7 @@ import os
 
 from smt.sampling_methods import LHS
 
-def vary_parameters_lhc(filename, num_samples, output_directory):
+def vary_parameters_lhc(filename, num_samples, output_directory, parameter_sets_only=False):
     forcefield = ForceField(filename, allow_cosmetic_attributes=True)
     lj_params = forcefield.get_parameter_handler('vdW', allow_cosmetic_attributes=True)
 
@@ -22,15 +22,22 @@ def vary_parameters_lhc(filename, num_samples, output_directory):
     sampling = LHS(xlimits=lj_sample_ranges)
     values = sampling(num_samples)
     os.makedirs(output_directory,exist_ok=True)
+    all_params = []
     for i, value in enumerate(values):
+        params = []
         reshape_values = value.reshape((int(n_dim/2), 2))
         counter = 0
         for lj in lj_params:
             if lj.smirks in smirks_types_to_change:
                 lj.epsilon *= reshape_values[counter, 0]
                 lj.rmin_half *= reshape_values[counter, 1]
+                params.append(lj.epsilon._value)
+                params.append(lj.rmin_half._value)
                 counter += 1
-        os.makedirs(os.path.join(output_directory,str(i+1)))
-        ff_name = 'force-field.offxml'
-        forcefield.to_file(os.path.join(output_directory, str(i+1),ff_name))
-
+        all_params.append(params)
+        if parameter_sets_only is False:
+            os.makedirs(os.path.join(output_directory,str(i+1)))
+            ff_name = 'force-field.offxml'
+            forcefield.to_file(os.path.join(output_directory, str(i+1),ff_name))
+    if parameter_sets_only is True:
+        return np.asarray(all_params)
