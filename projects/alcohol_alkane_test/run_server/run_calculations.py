@@ -11,7 +11,7 @@ def main(n_workers, cpus_per_worker, gpus_per_worker,ff_directory):
         result.estimated_properties.json(
             (os.path.join('estimated_results', "estimated_data_set_" + str(i) + '.json')), format = True)
     for i, forcefield in enumerate(forcefields):
-        forcefield.to_file(os.path.join('estimated_results', "force_field" + str(i) + '.offxml'))
+        forcefield.to_file(os.path.join('estimated_results', "force_field_" + str(i) + '.offxml'))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

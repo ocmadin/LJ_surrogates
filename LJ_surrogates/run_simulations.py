@@ -94,7 +94,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
                     os.path.join(files_directory, subdirectory, 'test-set-collection.json'))
 
                 requests.append(estimate_forcefield_properties(property_dataset,forcefield))
-                forcefields.append(forcefield)
+                forcefields.append(forcefield.to_force_field())
             results = [
                 request.results(synchronous=True, polling_interval=30)[0]
                 for request in requests
