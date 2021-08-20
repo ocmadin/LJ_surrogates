@@ -99,7 +99,6 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
                 request.results(synchronous=True, polling_interval=30)[0]
                 for request in requests
             ]
-
     return results, forcefields
 
 

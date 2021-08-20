@@ -7,9 +7,14 @@ import argparse
 
 
 def main(n_samples, output_directory, forcefield, data_filepath):
-    data_csv = pandas.read_csv(data_filepath)
-    data_csv['Id'] = data_csv['Id'].astype('string')
-    data_set = PhysicalPropertyDataSet.from_pandas(data_csv)
+    if data_filepath.endswith('.csv'):
+        data_csv = pandas.read_csv(data_filepath)
+        data_csv['Id'] = data_csv['Id'].astype('string')
+        data_set = PhysicalPropertyDataSet.from_pandas(data_csv)
+    elif data_filepath.endswith('.json'):
+        data_set = PhysicalPropertyDataSet.from_json(data_filepath)
+    else:
+        raise TypeError('File should either be a dataset in the format of a csv or json')
     data_set.json('test-set-collection.json')
 
     vary_parameters_lhc(forcefield, n_samples, output_directory)
