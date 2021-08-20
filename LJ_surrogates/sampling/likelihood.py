@@ -10,9 +10,8 @@ from pyro.infer import MCMC, NUTS
 
 class likelihood_function:
     def __init__(self, dataplex):
-        self.models = dataplex.surrogates
+        self.surrogates = dataplex.surrogates
         self.experimental_properties = dataplex.properties
-        self.dataplex = dataplex
         self.parameters = dataplex.initial_parameters
         self.flatten_parameters()
         experiment_vector = []
@@ -24,8 +23,7 @@ class likelihood_function:
         self.experimental_values = self.experimental_values.reshape(self.experimental_values.shape[0],1)
         self.uncertainty_values = torch.tensor(uncertainty_vector)
         self.uncertainty_values = self.uncertainty_values.reshape(self.uncertainty_values.shape[0],1)
-# Define our 'model' - i.e. the prior and likelihood functions that combined
-# define the posterior distribution we aim to draw samples from.
+
     def flatten_parameters(self):
         self.flat_parameters = []
         for key in self.parameters.keys():
@@ -33,6 +31,23 @@ class likelihood_function:
             self.flat_parameters.append(self.parameters[key][1]._value)
         self.flat_parameters = np.asarray(self.flat_parameters)
         self.flat_parameters = torch.tensor(self.flat_parameters.reshape(self.flat_parameters.shape[0],1).transpose())
+
+    def evaluate_parameter_set(self, parameter_set):
+
+        predictions_all = []
+        uncertainties_all = []
+        for surrogate in self.surrogates:
+            predictions = surrogate.likelihood(surrogate.model(torch.tensor(parameter_set)))
+            predictions_all.append(predictions.mean)
+            uncertainties_all.append(predictions.stddev)
+        uncertainties_all = torch.cat(uncertainties_all)
+        predictions_all = torch.cat(predictions_all)
+        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0],1)
+        predictions_all = predictions_all.reshape(predictions_all.shape[0],1)
+        return predictions_all, uncertainties_all
+
+
+
     def pyro_model(self):
 
         # Place priors on the virtual site charges increments and distance.
@@ -45,7 +60,7 @@ class likelihood_function:
                 self.flat_parameters * 0.25,
             ),
         )
-        predictions, predicted_uncertainties = self.dataplex.evaluate_parameter_set(parameters)
+        predictions, predicted_uncertainties = self.evaluate_parameter_set(parameters)
         uncertainty = pyro.deterministic(
             "uncertainty",torch.sqrt(self.uncertainty_values**2 + predicted_uncertainties**2))
 

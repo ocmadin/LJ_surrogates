@@ -8,7 +8,6 @@ class GPSurrogateModel:
     def __init__(self,parameter_data,property_data,property):
         self.X = torch.tensor(parameter_data)
         self.Y = torch.tensor(property_data.flatten())
-        self.property = property
     def build_surrogate(self):
         self.model = run_gpflow_scipy(self.X, self.Y,
                          gpflow.kernels.Matern12(lengthscales=0.5*np.ones(self.X.shape[1])))
@@ -36,6 +35,8 @@ class GPSurrogateModel:
             optimizer.step()
         self.model.eval()
         self.likelihood.eval()
+        delattr(self, 'X')
+        delattr(self, 'Y')
 
 
 
