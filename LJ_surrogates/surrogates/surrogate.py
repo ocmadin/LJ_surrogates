@@ -1,20 +1,20 @@
-import matplotlib.pyplot as plt
 import numpy as np
-import gpflow
-from fffit.fffit.models import run_gpflow_scipy
 import gpytorch
 import torch
 class GPSurrogateModel:
     def __init__(self,parameter_data,property_data,property):
-        self.X = torch.tensor(parameter_data)
-        self.Y = torch.tensor(property_data.flatten())
-    def build_surrogate(self):
-        self.model = run_gpflow_scipy(self.X, self.Y,
-                         gpflow.kernels.Matern12(lengthscales=0.5*np.ones(self.X.shape[1])))
+        self.cuda = torch.device('cuda')
+        self.X = torch.tensor(parameter_data).to(device=self.cuda)
+        self.Y = torch.tensor(property_data.flatten()).to(device=self.cuda)
+        # self.X = torch.tensor(parameter_data)
+        # self.Y = torch.tensor(property_data.flatten())
 
     def build_surrogate_GPytorch(self):
-        self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
-        self.model = ExactGPModel(self.X, self.Y, self.likelihood)
+
+        self.likelihood = gpytorch.likelihoods.GaussianLikelihood().cuda()
+        self.model = ExactGPModel(self.X, self.Y, self.likelihood).cuda()
+        # self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        # self.model = ExactGPModel(self.X, self.Y, self.likelihood)
         self.model.train()
         self.likelihood.train()
         training_iter = 50

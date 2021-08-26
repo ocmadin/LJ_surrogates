@@ -143,6 +143,7 @@ class ParameterSetDataMultiplex:
             model = GPSurrogateModel(parameter_data=self.parameter_values.values,
                                      property_data=individual_property_measurements, property=self.properties.properties[i])
             model.build_surrogate_GPytorch()
+            model.model.train_targets = model.model.train_targets.detach()
 
             surrogates.append(model)
         self.surrogates = surrogates
