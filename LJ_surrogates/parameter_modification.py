@@ -42,7 +42,7 @@ def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to
         if parameter_sets_only is False:
             os.makedirs(os.path.join(output_directory,str(i+1)))
             ff_name = 'force-field.offxml'
-            forcefield.to_file(os.path.join(output_directory, str(i+1),ff_name))
+            ff_copy.to_file(os.path.join(output_directory, str(i+1),ff_name))
     if parameter_sets_only is True:
         return np.asarray(all_params)
 
