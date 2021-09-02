@@ -3,10 +3,13 @@ import os
 import pandas
 from openff.evaluator.datasets import PhysicalPropertyDataSet
 import shutil
+import numpy as np
 import argparse
 
 
-def main(n_samples, output_directory, forcefield, data_filepath, smirks, range):
+def main(n_samples, output_directory, forcefield, data_filepath):
+    smirks = ['[#6X4:1]']
+    param_range = [0.9,1.0]
     if data_filepath.endswith('.csv'):
         data_csv = pandas.read_csv(data_filepath)
         data_csv['Id'] = data_csv['Id'].astype('string')
@@ -17,7 +20,7 @@ def main(n_samples, output_directory, forcefield, data_filepath, smirks, range):
         raise TypeError('File should either be a dataset in the format of a csv or json')
     data_set.json('test-set-collection.json')
 
-    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, range)
+    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, np.asarray(param_range))
 
     for folder in os.listdir(output_directory):
         shutil.copy2('test-set-collection.json', os.path.join(output_directory, folder))
