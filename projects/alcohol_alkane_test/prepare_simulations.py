@@ -87,4 +87,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main(args.samples, args.output_directory, args.forcefield, args.dataset, args.smirks, args.range)
+    main(args.samples, args.output_directory, args.forcefield, args.dataset)
