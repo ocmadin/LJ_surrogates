@@ -1,13 +1,19 @@
 import numpy as np
+import numpyro.distributions
 import pyro
 import pyro.distributions
 import torch
 import torch.distributions
-#from pyro.infer import MCMC, NUTS, HMC
-from numpyro.infer import MCMC, NUTS, HMC
-import numpyro
-from jax.random import PRNGKey
+from pyro.infer import MCMC, NUTS, HMC
+# from numpyro.infer import MCMC, NUTS, HMC
+import numpyro.distributions as npdist
+# from jax.random import PRNGKey
+import gpytorch
 import functools
+import time
+import arviz
+
+
 class likelihood_function:
     def __init__(self, dataplex):
         self.cuda = torch.device('cuda')
@@ -27,23 +33,29 @@ class likelihood_function:
 
     def flatten_parameters(self):
         self.flat_parameters = []
+        self.flat_parameter_names = []
         for key in self.parameters.keys():
             self.flat_parameters.append(self.parameters[key][0]._value)
             self.flat_parameters.append(self.parameters[key][1]._value)
+            self.flat_parameter_names.append(key + '_epsilon')
+            self.flat_parameter_names.append(key + '_rmin_half')
         self.flat_parameters = np.asarray(self.flat_parameters)
         # self.flat_parameters = torch.tensor(self.flat_parameters.reshape(self.flat_parameters.shape[0],1).transpose())
-        self.flat_parameters = torch.tensor(self.flat_parameters.reshape(self.flat_parameters.shape[0],1).transpose()).to(device=self.cuda)
+        self.flat_parameters = torch.tensor(np.expand_dims(self.flat_parameters, axis=1).transpose()).to(
+            device=self.cuda)
+
     def evaluate_parameter_set(self, parameter_set):
         self.parameter_set = parameter_set
         predictions_all = []
         uncertainties_all = []
         for surrogate in self.surrogates:
-            predictions_all.append(surrogate.likelihood(surrogate.model(torch.tensor(parameter_set))).mean)
-            uncertainties_all.append(surrogate.likelihood(surrogate.model(torch.tensor(parameter_set))).stddev)
+            mean,variance = self.evaluate_surrogate_explicit_params(surrogate, parameter_set)
+            predictions_all.append(mean)
+            uncertainties_all.append(variance)
         uncertainties_all = torch.cat(uncertainties_all)
         predictions_all = torch.cat(predictions_all)
-        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0],1).to(device=self.cuda)
-        predictions_all = predictions_all.reshape(predictions_all.shape[0],1).to(device=self.cuda)
+        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1).to(device=self.cuda)
+        predictions_all = predictions_all.reshape(predictions_all.shape[0], 1).to(device=self.cuda)
         # predictions_all = predictions_all.reshape(predictions_all.shape[0], 1)
         # uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1)
 
@@ -53,34 +65,52 @@ class likelihood_function:
         self.parameter_set = parameter_set
         x_map = list(map(self.evaluate_surrogate, self.surrogates))
         predictions = torch.tensor(x_map).cuda()
-        return predictions[:,0].unsqueeze(-1), predictions[:,1].unsqueeze(-1)
+        return predictions[:, 0].unsqueeze(-1), predictions[:, 1].unsqueeze(-1)
+
 
     def evaluate_surrogate(self, surrogate):
-        eval = surrogate.likelihood(surrogate.model(self.parameter_set))
-        return eval.mean,eval.stddev
+        with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
+                True) and gpytorch.settings.fast_pred_var(True):
+            eval = surrogate.likelihood(surrogate.model(self.parameter_set))
+        return eval.mean, eval.variance
+
+    def evaluate_surrogate_explicit_params(self, surrogate, parameter_set):
+        self.parameter_set = parameter_set
+        with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
+                True) and gpytorch.settings.fast_pred_var(True):
+            eval = surrogate.likelihood(surrogate.model(self.parameter_set))
+        return eval.mean, eval.variance
+
+    def evaluate_surrogate_gpflow(self, surrogate, parameter_set):
+        before = time.time()
+        mean, variance = surrogate.model_gpflow.predict_f(np.expand_dims(parameter_set[:, 0], axis=1).transpose())
+        after = time.time()
+        print(f'Mean: {mean}')
+        print(f'Variance: {variance}')
+        print(f'GPflow: {after - before} seconds')
+        return
 
     def pyro_model(self):
-
         # Place priors on the virtual site charges increments and distance.
-        parameters = numpyro.sample(
+        parameters = pyro.sample(
             "parameters",
-            numpyro.distributions.Normal(
+            pyro.distributions.Normal(
                 # Use a normal distribution centered at one and with a sigma of 0.5
                 # to stop the distance collapsing to 0 or growing too large.
-                self.flat_parameters,
-                self.flat_parameters * 0.25,
-            ),
+                loc=self.flat_parameters,
+                scale=self.flat_parameters * 0.1,
+            )
         )
 
-        predictions, predicted_uncertainties = self.evaluate_parameter_set_map(parameters)
-        uncertainty = numpyro.deterministic(
-            "uncertainty",torch.sqrt(torch.square(self.uncertainty_values) + torch.square(predicted_uncertainties)))
+        predictions, predicted_uncertainties = self.evaluate_surrogate_explicit_params(self.surrogates[0], parameters)
+        uncertainty = pyro.deterministic(
+            "uncertainty", torch.sqrt(torch.square(self.uncertainty_values) + torch.square(predicted_uncertainties)))
         # uncertainty = pyro.deterministic(
         #     "uncertainty", self.uncertainty_values)
 
-        return numpyro.sample(
+        return pyro.sample(
             "predicted_residuals",
-            numpyro.distributions.Normal(loc=predictions, scale=uncertainty),
+            pyro.distributions.Normal(loc=predictions, scale=uncertainty),
             obs=self.experimental_values,
         ).cuda()
 
@@ -90,15 +120,17 @@ class likelihood_function:
         #     obs=self.experimental_values,
         # )
 
-    def sample(self,samples):
-        #Train the parameters and plot the sampled traces.
+    def sample(self, samples):
+        # Train the parameters and plot the sampled traces.
         nuts_kernel = NUTS(self.pyro_model)
-        # self.mcmc = MCMC(nuts_kernel, num_samples=samples, warmup_steps=int(np.floor(samples/5)), num_chains=1)
-        self.mcmc = MCMC(nuts_kernel, num_samples=samples, num_warmup=int(np.floor(samples/5)), num_chains=1)
+        initial_params = {'parameters': self.flat_parameters}
 
-        self.mcmc.run(rng_key=PRNGKey(897))
+        self.mcmc = MCMC(nuts_kernel, initial_params=initial_params, num_samples=samples,
+                         warmup_steps=int(np.floor(samples / 5)), num_chains=1)
+        # self.mcmc = MCMC(nuts_kernel, num_samples=samples, num_warmup=int(np.floor(samples/5)), num_chains=1)
 
+        self.mcmc.run()
+        self.mcmc.summary()
+        self.samples = self.mcmc.get_samples()
 
-
-
-
+        return self.mcmc

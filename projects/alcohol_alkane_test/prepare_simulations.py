@@ -6,7 +6,7 @@ import shutil
 import argparse
 
 
-def main(n_samples, output_directory, forcefield, data_filepath):
+def main(n_samples, output_directory, forcefield, data_filepath, smirks, range):
     if data_filepath.endswith('.csv'):
         data_csv = pandas.read_csv(data_filepath)
         data_csv['Id'] = data_csv['Id'].astype('string')
@@ -17,7 +17,7 @@ def main(n_samples, output_directory, forcefield, data_filepath):
         raise TypeError('File should either be a dataset in the format of a csv or json')
     data_set.json('test-set-collection.json')
 
-    vary_parameters_lhc(forcefield, n_samples, output_directory)
+    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, range)
 
     for folder in os.listdir(output_directory):
         shutil.copy2('test-set-collection.json', os.path.join(output_directory, folder))
@@ -65,6 +65,23 @@ if __name__ == "__main__":
         default=1,
     )
 
+    parser.add_argument(
+        "--smirks",
+        "-s",
+        type=list,
+        help="List of SMIRKS types to vary",
+        required=False,
+        default=1,
+    )
+
+    parser.add_argument(
+        "--range",
+        "-r",
+        type=list,
+        help="Parameter Range (decimal)",
+        required=False,
+        default=1,
+    )
     args = parser.parse_args()
 
-    main(args.samples, args.output_directory, args.forcefield, args.dataset)
+    main(args.samples, args.output_directory, args.forcefield, args.dataset, args.smirks, args.range)

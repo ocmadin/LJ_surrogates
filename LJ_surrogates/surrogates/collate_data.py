@@ -132,6 +132,7 @@ class ParameterSetDataMultiplex:
 
     def build_surrogates(self):
         surrogates = []
+
         if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
             raise ValueError('Number of Parameter Sets and Measurement Sets must agree!')
         else:
@@ -141,10 +142,9 @@ class ParameterSetDataMultiplex:
             individual_property_measurements = surrogate_measurements[i].reshape(
                 (surrogate_measurements[0].shape[0], 1))
             model = GPSurrogateModel(parameter_data=self.parameter_values.values,
-                                     property_data=individual_property_measurements, property=self.properties.properties[i])
+                                     property_data=individual_property_measurements)
             model.build_surrogate_GPytorch()
             model.model.train_targets = model.model.train_targets.detach()
-
             surrogates.append(model)
         self.surrogates = surrogates
 
