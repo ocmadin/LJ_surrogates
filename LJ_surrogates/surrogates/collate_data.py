@@ -8,7 +8,7 @@ import torch
 from LJ_surrogates.surrogates.surrogate import GPSurrogateModel
 
 
-def collate_physical_property_data(directory, smirks, properties_filepath):
+def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath):
     data = []
     for i in range(int(len(os.listdir(directory)) / 2)):
         if os.path.isfile(os.path.join(directory, 'force_field_' + str(i) + '.offxml')) and os.path.isfile(
@@ -19,7 +19,7 @@ def collate_physical_property_data(directory, smirks, properties_filepath):
             parameters = get_force_field_parameters(forcefield, smirks)
             if len(results) != 0:
                 data.append([results, parameters])
-    initial_forcefield = ForceField('openff-1-3-0.offxml')
+    initial_forcefield = ForceField(initial_forcefield)
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
     properties = PhysicalPropertyDataSet.from_json(properties_filepath)
     dataplex = get_training_data_new(data, properties, initial_parameters)
