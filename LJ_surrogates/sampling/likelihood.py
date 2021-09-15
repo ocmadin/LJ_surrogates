@@ -102,7 +102,7 @@ class likelihood_function:
             )
         )
 
-        predictions, predicted_uncertainties = self.evaluate_surrogate_explicit_params(self.surrogates[0], parameters)
+        predictions, predicted_uncertainties = self.evaluate_parameter_set(parameters)
         uncertainty = pyro.deterministic(
             "uncertainty", torch.sqrt(torch.square(self.uncertainty_values) + torch.square(predicted_uncertainties)))
         # uncertainty = pyro.deterministic(
@@ -122,7 +122,7 @@ class likelihood_function:
 
     def sample(self, samples):
         # Train the parameters and plot the sampled traces.
-        nuts_kernel = NUTS(self.pyro_model)
+        nuts_kernel = NUTS(self.pyro_model,step_size=0.001)
         initial_params = {'parameters': self.flat_parameters}
 
         self.mcmc = MCMC(nuts_kernel, initial_params=initial_params, num_samples=samples,
@@ -134,3 +134,4 @@ class likelihood_function:
         self.samples = self.mcmc.get_samples()
 
         return self.mcmc
+
