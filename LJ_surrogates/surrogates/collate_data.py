@@ -105,11 +105,8 @@ class ParameterSetDataMultiplex:
             all_parameters.append(parameters)
         property_labels = []
         for property in self.properties.properties:
-            if str(property.value.u) == 'g / ml':
-                property_type = '_density'
-            elif str(property.value.u) == 'kJ / mol':
-                property_type = '_enthalpy_of_mixing'
-            property_labels.append(str(property.substance) + property_type)
+            property_type = str(type(property)).split(sep='.')[-1].rstrip("'>")
+            property_labels.append(str(property.substance) + "_" + property_type)
         property_measurements = []
         property_uncertainties = []
         for data in self.multi_data:

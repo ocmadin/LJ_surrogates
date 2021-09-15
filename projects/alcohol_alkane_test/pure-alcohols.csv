@@ -1,0 +1,9 @@
+Id,Temperature (K),Pressure (kPa),Phase,N Components,EnthalpyOfVaporization Value (kJ / mol),EnthalpyOfVaporization Uncertainty (kJ / mol),Source,Component 1,Mole Fraction 1,Exact Amount 1,Role 1,Density Value (g / ml),Density Uncertainty (g / ml)
+,298.15,101.325,Liquid + Gas,1,37.83,0.11349,10.1016/0378-3812(85)90026-3,CO,1.0,0,Solvent,,
+,298.15,101.325,Liquid,1,,,10.1016/j.fluid.2013.11.008,CO,1.0,0,Solvent,0.7859000000000002,0.02
+,298.15,101.325,Liquid + Gas,1,42.46,0.12738,10.1016/0378-3812(85)90026-3,CCO,1.0,0,Solvent,,
+,298.15,101.325,Liquid,1,,,10.1016/j.fluid.2013.11.008,CCO,1.0,0,Solvent,0.7864000000000002,0.02
+,298.15,101.325,Liquid + Gas,1,47.5,0.1425,10.1016/0378-3812(85)90026-3,CCCO,1.0,0,Solvent,,
+,298.15,101.325,Liquid,1,,,10.1021/je900212d,CCCO,1.0,0,Solvent,0.8032000000000002,0.00355
+,298.15,101.325,Liquid + Gas,1,52.42,0.15726,10.1016/0378-3812(85)90026-3,CCCCO,1.0,0,Solvent,,
+,298.15,101.325,Liquid,1,,,10.1016/j.fluid.2013.11.008,CCCCO,1.0,0,Solvent,0.8055000000000002,0.02

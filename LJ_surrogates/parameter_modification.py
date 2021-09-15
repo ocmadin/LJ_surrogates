@@ -8,9 +8,10 @@ import copy
 
 from smt.sampling_methods import LHS
 
-def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to_change, param_range, parameter_sets_only=False):
-    forcefield = ForceField(filename, allow_cosmetic_attributes=True)
 
+def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to_change, param_range,
+                        parameter_sets_only=False):
+    forcefield = ForceField(filename, allow_cosmetic_attributes=True)
 
     # smirks_types_to_change = ['[#6X4:1]']
     # smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]']
@@ -23,13 +24,13 @@ def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to
     lj_sample_ranges = np.asarray(lj_sample_ranges)
     sampling = LHS(xlimits=lj_sample_ranges)
     values = sampling(num_samples)
-    os.makedirs(output_directory,exist_ok=True)
+    os.makedirs(output_directory, exist_ok=True)
     all_params = []
     for i, value in enumerate(values):
         ff_copy = copy.deepcopy(forcefield)
         lj_params = ff_copy.get_parameter_handler('vdW', allow_cosmetic_attributes=True)
         params = []
-        reshape_values = value.reshape((int(n_dim/2), 2))
+        reshape_values = value.reshape((int(n_dim / 2), 2))
         counter = 0
         for lj in lj_params:
             if lj.smirks in smirks_types_to_change:
@@ -40,11 +41,12 @@ def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to
                 counter += 1
         all_params.append(params)
         if parameter_sets_only is False:
-            os.makedirs(os.path.join(output_directory,str(i+1)))
+            os.makedirs(os.path.join(output_directory, str(i + 1)))
             ff_name = 'force-field.offxml'
-            ff_copy.to_file(os.path.join(output_directory, str(i+1),ff_name))
+            ff_copy.to_file(os.path.join(output_directory, str(i + 1), ff_name))
     if parameter_sets_only is True:
         return np.asarray(all_params)
+
 
 def create_evaluation_grid(filename, smirks_types_to_change, param_range):
     forcefield = ForceField(filename, allow_cosmetic_attributes=True)
@@ -59,8 +61,8 @@ def create_evaluation_grid(filename, smirks_types_to_change, param_range):
         if lj.smirks in smirks_types_to_change:
             vals_eps = lj.epsilon._value * param_range
             vals_rmin = lj.rmin_half._value * param_range
-            lin_eps = np.linspace(vals_eps[0],vals_eps[1], num = 100)
-            lin_rmin = np.linspace(vals_rmin[0],vals_rmin[1], num = 100)
+            lin_eps = np.linspace(vals_eps[0], vals_eps[1], num=100)
+            lin_rmin = np.linspace(vals_rmin[0], vals_rmin[1], num=100)
             ranges.append(lin_eps)
             ranges.append(lin_rmin)
     grid = np.meshgrid(*ranges)
