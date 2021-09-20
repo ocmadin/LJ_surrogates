@@ -49,7 +49,7 @@ class likelihood_function:
         predictions_all = []
         uncertainties_all = []
         for surrogate in self.surrogates:
-            mean,variance = self.evaluate_surrogate_explicit_params(surrogate, parameter_set)
+            mean, variance = self.evaluate_surrogate_explicit_params(surrogate, parameter_set)
             predictions_all.append(mean)
             uncertainties_all.append(variance)
         uncertainties_all = torch.cat(uncertainties_all)
@@ -66,7 +66,6 @@ class likelihood_function:
         x_map = list(map(self.evaluate_surrogate, self.surrogates))
         predictions = torch.tensor(x_map).cuda()
         return predictions[:, 0].unsqueeze(-1), predictions[:, 1].unsqueeze(-1)
-
 
     def evaluate_surrogate(self, surrogate):
         with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
@@ -120,13 +119,13 @@ class likelihood_function:
         #     obs=self.experimental_values,
         # )
 
-    def sample(self, samples):
+    def sample(self, samples, step_size=0.001, max_tree_depth=10, num_chains=1):
         # Train the parameters and plot the sampled traces.
-        nuts_kernel = NUTS(self.pyro_model,step_size=0.001)
-        initial_params = {'parameters': self.flat_parameters}
+        nuts_kernel = NUTS(self.pyro_model, step_size=step_size, max_tree_depth=max_tree_depth)
+        initial_params = {'parameters': torch.tile(self.flat_parameters, (num_chains, 1))}
 
         self.mcmc = MCMC(nuts_kernel, initial_params=initial_params, num_samples=samples,
-                         warmup_steps=int(np.floor(samples / 5)), num_chains=1)
+                         warmup_steps=int(np.floor(samples / 5)), num_chains=num_chains, mp_context='spawn')
         # self.mcmc = MCMC(nuts_kernel, num_samples=samples, num_warmup=int(np.floor(samples/5)), num_chains=1)
 
         self.mcmc.run()
@@ -134,4 +133,3 @@ class likelihood_function:
         self.samples = self.mcmc.get_samples()
 
         return self.mcmc
-

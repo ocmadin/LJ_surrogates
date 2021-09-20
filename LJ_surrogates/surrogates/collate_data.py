@@ -6,6 +6,7 @@ import json
 import numpy as np
 import torch
 from LJ_surrogates.surrogates.surrogate import GPSurrogateModel
+import matplotlib.pyplot as plt
 
 
 def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath):
@@ -75,7 +76,9 @@ class ParameterSetDataMultiplex:
 
     def check_properties(self):
         multi_data = []
+        self.properties = canonicalize_dataset(self.properties)
         for dataset in self.multi_data:
+            dataset.property_measurements = canonicalize_dataset(dataset.property_measurements)
             equality = True
             if len(self.properties) != len(dataset.property_measurements):
                 equality = False
@@ -155,11 +158,28 @@ class ParameterSetDataMultiplex:
             uncertainties_all.append(predictions.stddev)
         uncertainties_all = torch.cat(uncertainties_all)
         predictions_all = torch.cat(predictions_all)
-        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0],1)
-        predictions_all = predictions_all.reshape(predictions_all.shape[0],1)
+        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1)
+        predictions_all = predictions_all.reshape(predictions_all.shape[0], 1)
         return predictions_all, uncertainties_all
         return predictions_all
+
+    def plot_properties(self):
+        os.makedirs(os.path.join('result','properties','figures'), exist_ok=True)
+        x_range = np.linspace(0,self.property_measurements.shape[0]-1,num=self.property_measurements.shape[0])
+        for i, column in enumerate(self.property_measurements.columns):
+            plt.errorbar(x_range, self.property_measurements[column].values, yerr=self.property_uncertainties[column].values, ls='none', capsize=0, marker='x')
+            plt.axhline(self.properties.properties[i].value.m)
+            plt.title(
+                f'{str(self.properties.properties[i].substance)}: {self.properties.properties[i].value} +/- {self.properties.properties[i].uncertainty}')
+            plt.xlabel('Parameter Set')
+            plt.ylabel('Property Value')
+            label = f'{str(self.properties.properties[i].substance)}_{self.properties.properties[i].value}'
+            plt.savefig(os.path.join('result','properties','figures','property_'+str(i)+'.png'), dpi=300)
+            plt.clf()
+
+
 def get_training_data_new(data, properties, parameters):
+
     data_list = []
     for datum in data:
         data_list.append(ParameterSetData(datum))
@@ -186,3 +206,21 @@ def get_training_data(data):
         train_data[id] = [np.asarray(datum[1][0]), np.asarray(X), np.asarray(Y)]
         properties_all.append(train_data)
     return properties_all
+
+
+def canonicalize_dataset(dataset):
+    if not isinstance(dataset, PhysicalPropertyDataSet):
+        raise TypeError('Dataset must be a PhysicalPropertyDataSet object')
+    ids = []
+    for property in dataset.properties:
+        ids.append(int(property.id, 16))
+    ids = sorted(ids)
+    for i, id in enumerate(ids):
+        ids[i] = format(id, 'x')
+    properties = []
+    for id in ids:
+        for property in dataset.properties:
+            if property.id == id:
+                properties.append(property)
+    dataset._properties = tuple(properties)
+    return dataset
