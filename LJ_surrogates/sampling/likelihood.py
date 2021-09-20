@@ -70,14 +70,14 @@ class likelihood_function:
     def evaluate_surrogate(self, surrogate):
         with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                 True) and gpytorch.settings.fast_pred_var(True):
-            eval = surrogate.likelihood(surrogate.model(self.parameter_set))
+            eval = surrogate[1](surrogate[0](self.parameter_set))
         return eval.mean, eval.variance
 
     def evaluate_surrogate_explicit_params(self, surrogate, parameter_set):
         self.parameter_set = parameter_set
         with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                 True) and gpytorch.settings.fast_pred_var(True):
-            eval = surrogate.likelihood(surrogate.model(self.parameter_set))
+            eval = surrogate[1](surrogate[0](self.parameter_set))
         return eval.mean, eval.variance
 
     def evaluate_surrogate_gpflow(self, surrogate, parameter_set):
