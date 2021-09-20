@@ -30,7 +30,7 @@ test_params = vary_parameters_lhc(forcefield, 2, '.', smirks_types_to_change, [0
                                   parameter_sets_only=True).transpose()
 test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).to(
     device=device).detach()
-grid = create_evaluation_grid(forcefield, smirks_types_to_change, np.array([0.75, 1.25]))
+grid = create_evaluation_grid(forcefield, smirks_types_to_change, np.array([0.25, 1.75]))
 likelihood = likelihood_function(dataplex)
 
 
@@ -62,10 +62,11 @@ print(f'Without map: {end - start} seconds')
 mcmc = likelihood.sample(samples=1000, step_size=0.001,max_tree_depth=5,num_chains=1)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
 ranges = dataplex.export_sampling_ranges()
-plot_triangle(params,likelihood,ranges)
 # likelihood.evaluate_surrogate_gpflow(likelihood.surrogates[0],test_params)
 os.makedirs(os.path.join('result','figures'),exist_ok=True)
 np.save(os.path.join('result','params.npy'), params)
+plot_triangle(params,likelihood,ranges)
+
 
 plt.clf()
 for i, surrogate in enumerate(likelihood.surrogates):
