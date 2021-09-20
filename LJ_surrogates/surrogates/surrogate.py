@@ -119,3 +119,45 @@ class ExactGPModel(gpytorch.models.ExactGP):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+def build_surrogate_lightweight(parameter_data,property_data):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data.flatten()).to(device=cuda)
+
+    class ExactGPModel(gpytorch.models.ExactGP):
+        def __init__(self, train_x, train_y, likelihood):
+            super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
+            self.mean_module = gpytorch.means.ConstantMean()
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+
+        def forward(self, x):
+            mean_x = self.mean_module(x)
+            covar_x = self.covar_module(x)
+            return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+    likelihood = gpytorch.likelihoods.GaussianLikelihood().cuda()
+    model = ExactGPModel(X, Y, likelihood).cuda()
+    # self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    # self.model = ExactGPModel(self.X, self.Y, self.likelihood)
+    model.train()
+    likelihood.train()
+    training_iter = 1000
+    # Use the adam optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
+
+    # "Loss" for GPs - the marginal log likelihood
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+    for i in range(training_iter):
+        # Zero gradients from previous iteration
+        optimizer.zero_grad()
+        # Output from model
+        output = model(X)
+        # Calc loss and backprop gradients
+        loss = -mll(output, Y)
+        loss.backward()
+        optimizer.step()
+    model.eval()
+    likelihood.eval()
+    return [model, likelihood]

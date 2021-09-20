@@ -5,7 +5,7 @@ import os
 import json
 import numpy as np
 import torch
-from LJ_surrogates.surrogates.surrogate import GPSurrogateModel
+from LJ_surrogates.surrogates.surrogate import GPSurrogateModel, build_surrogate_lightweight
 import matplotlib.pyplot as plt
 
 
@@ -141,11 +141,14 @@ class ParameterSetDataMultiplex:
         for i in range(num_surrogates):
             individual_property_measurements = surrogate_measurements[i].reshape(
                 (surrogate_measurements[0].shape[0], 1))
-            model = GPSurrogateModel(parameter_data=self.parameter_values.values,
-                                     property_data=individual_property_measurements)
-            model.build_surrogate_GPytorch()
-            model.model.train_targets = model.model.train_targets.detach()
+            # model = GPSurrogateModel(parameter_data=self.parameter_values.values,
+            #                          property_data=individual_property_measurements)
+            # model.build_surrogate_GPytorch()
+            # model.model.train_targets = model.model.train_targets.detach()
+            model = build_surrogate_lightweight(self.parameter_values.values,individual_property_measurements)
+            model[0].train_targets = model[0].train_targets.detach()
             surrogates.append(model)
+
         self.surrogates = surrogates
 
     def evaluate_parameter_set(self, parameter_set):
@@ -162,6 +165,15 @@ class ParameterSetDataMultiplex:
         predictions_all = predictions_all.reshape(predictions_all.shape[0], 1)
         return predictions_all, uncertainties_all
         return predictions_all
+
+    def export_sampling_ranges(self):
+        params = self.parameter_values.to_numpy()
+        ranges = []
+        for i in range(params.shape[1]):
+            ranges.append([min(params[:,i]),max(params[:,i])])
+
+        ranges = np.asarray(ranges)
+        return ranges
 
     def plot_properties(self):
         os.makedirs(os.path.join('result','properties','figures'), exist_ok=True)

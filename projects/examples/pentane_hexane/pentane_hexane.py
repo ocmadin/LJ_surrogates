@@ -12,24 +12,24 @@ import matplotlib.pyplot as plt
 import gc
 import numpy as np
 import os
-import textwrap
+from LJ_surrogates.plotting.plotting import plot_triangle
 
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/alcohol_alkane/linear_alcohols'
-smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]', '[#8X2H1+0:1]', '[#1:1]-[#8]','[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]']
+path = '../../../data/pentane-hexane'
+smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]']
 forcefield = 'openff-1-3-0.offxml'
-dataset_json = 'pure-alcohols.json'
+dataset_json = 'test-set-collection-pent-hex-density.json'
 
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json)
-dataplex.plot_properties()
 test_params = vary_parameters_lhc(forcefield, 2, '.', smirks_types_to_change, [0.9, 1.1],
                                   parameter_sets_only=True).transpose()
 test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).to(
     device=device).detach()
+grid = create_evaluation_grid(forcefield, smirks_types_to_change, np.array([0.75, 1.25]))
 likelihood = likelihood_function(dataplex)
 
 start = time.time()
@@ -44,7 +44,7 @@ start = time.time()
 predictions_map = likelihood.evaluate_parameter_set_map(test_params_one)
 end = time.time()
 print(f'Without map: {end - start} seconds')
-mcmc = likelihood.sample(samples=500,step_size=0.0001,max_tree_depth=5,num_chains=1)
+mcmc = likelihood.sample(samples=1000)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
 
 
@@ -54,14 +54,5 @@ params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
 os.makedirs(os.path.join('result','figures'),exist_ok=True)
 np.save(os.path.join('result','params.npy'), params)
 
-df = pandas.DataFrame(params, columns=likelihood.flat_parameter_names)
-wrapper = textwrap.TextWrapper(width=25)
-columns = {}
-for i,column in enumerate(df.columns):
-    columns[column] = wrapper.fill(column)
-df.rename(columns=columns,inplace=True)
-
-pairplot = seaborn.pairplot(df, kind='kde', corner=True)
-pairplot.map_upper(seaborn.kdeplot, levels=4, color=".2")
-plt.show()
-pairplot.savefig(os.path.join('result/figures','trace.png'), dpi=300)
+ranges = dataplex.export_sampling_ranges()
+plot_triangle(params,likelihood,ranges)

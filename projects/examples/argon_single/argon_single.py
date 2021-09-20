@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import gc
 import numpy as np
 import os
-
+import textwrap
+from LJ_surrogates.plotting.plotting import plot_triangle
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
@@ -39,7 +40,7 @@ def grid_to_surrogate_2D(grid, surrogate):
 
     for i in range(grid[0].shape[0]):
         for j in range(grid[0].shape[1]):
-            val = surrogate.likelihood(surrogate.model(
+            val = surrogate[1](surrogate[0](
                 torch.tensor(np.expand_dims(np.asarray([grid[0][i, j], grid[1][i, j]]), axis=1).transpose()).cuda()))
             value_grid[i, j] = val.mean
             uncertainty_grid[i, j] = val.stddev
@@ -58,23 +59,17 @@ start = time.time()
 predictions_map = likelihood.evaluate_parameter_set_map(test_params_one)
 end = time.time()
 print(f'Without map: {end - start} seconds')
-mcmc = likelihood.sample(samples=1000, step_size=0.001,max_tree_depth=5,num_chains=5)
+mcmc = likelihood.sample(samples=1000, step_size=0.001,max_tree_depth=5,num_chains=1)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
-
-
+ranges = dataplex.export_sampling_ranges()
+plot_triangle(params,likelihood,ranges)
 # likelihood.evaluate_surrogate_gpflow(likelihood.surrogates[0],test_params)
-
-
 os.makedirs(os.path.join('result','figures'),exist_ok=True)
 np.save(os.path.join('result','params.npy'), params)
 
-df = pandas.DataFrame(params, columns=likelihood.flat_parameter_names)
-pairplot = seaborn.pairplot(df, kind='kde', corner=True)
-pairplot.map_upper(seaborn.kdeplot, levels=4, color=".2")
-plt.show()
-pairplot.savefig(os.path.join('result/figures','trace.png'), dpi=300)
-
+plt.clf()
 for i, surrogate in enumerate(likelihood.surrogates):
+
     value_grid, uncertainty_grid = grid_to_surrogate_2D(grid, surrogate)
     expt_value = dataplex.properties.properties[i]._value.m
     expt_uncertainty = dataplex.properties.properties[i]._uncertainty.m
