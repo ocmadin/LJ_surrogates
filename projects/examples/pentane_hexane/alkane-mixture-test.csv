@@ -1,0 +1,2 @@
+Id,Temperature (K),Pressure (kPa),Phase,N Components,Density Value (g / ml),Density Uncertainty (g / ml),Source,Component 1,Mole Fraction 1,Exact Amount 1,Role 1,Component 2,Mole Fraction 2,Exact Amount 2,Role 2,EnthalpyOfMixing Value (kJ / mol),EnthalpyOfMixing Uncertainty (kJ / mol)
+,298.15,101,Liquid,2,0.63966,0.000355,10.1016/j.jct.2005.05.020,CCCCC,0.5,0,Solvent,CCCCCC,0.5,0,Solvent,,
