@@ -8,6 +8,7 @@ import gpflow
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import pandas
+import copy
 
 
 class GPSurrogateModel:
@@ -256,3 +257,16 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
     plt.ylabel('Simulation Value')
     plt.savefig(os.path.join('validation', 'cross-validation_' + str(label) + '.png'))
     plt.close()
+
+def compute_surrogate_gradients(surrogate, point, eps):
+    gradients = []
+    for i, param in enumerate(point):
+        perturbed_point_1 = copy.deepcopy(point)
+        perturbed_point_1[i] =  point[i] + eps * point[i]
+        perturbed_point_2 = copy.deepcopy(point)
+        perturbed_point_2[i] = point[i] - eps * point[i]
+        gradient = (surrogate(torch.tensor(numpy.expand_dims(perturbed_point_1,axis=1).T).cuda()).mean - surrogate(torch.tensor(numpy.expand_dims(perturbed_point_2,axis=1).T).cuda()).mean)/(2*eps*point[i])
+        gradients.append(gradient)
+    return gradients
+
+

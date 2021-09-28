@@ -16,12 +16,10 @@ def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to
     # smirks_types_to_change = ['[#6X4:1]']
     # smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]']
     # smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]', '[#8X2H1+0:1]', '[#1:1]-[#8]']
-
-
+    n_dim = len(smirks_types_to_change) * 2
     if nonuniform_ranges is True:
         lj_sample_ranges = np.asarray(param_range)
     else:
-        n_dim = len(smirks_types_to_change) * 2
         lj_sample_ranges = []
         for i in range(n_dim):
             lj_sample_ranges.append(param_range)
@@ -38,8 +36,12 @@ def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to
         counter = 0
         for lj in lj_params:
             if lj.smirks in smirks_types_to_change:
-                lj.epsilon *= reshape_values[counter, 0]
-                lj.rmin_half *= reshape_values[counter, 1]
+                if nonuniform_ranges is True:
+                    lj.epsilon = reshape_values[counter, 0] * unit.kilocalorie_per_mole
+                    lj.rmin_half = reshape_values[counter, 1] * unit.angstrom
+                else:
+                    lj.epsilon *= reshape_values[counter, 0]
+                    lj.rmin_half *= reshape_values[counter, 1]
                 params.append(lj.epsilon._value)
                 params.append(lj.rmin_half._value)
                 counter += 1
