@@ -29,9 +29,8 @@ test_params = vary_parameters_lhc(forcefield, 2, '.', smirks_types_to_change, [0
                                   parameter_sets_only=True).transpose()
 test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).to(
     device=device).detach()
-grid = create_evaluation_grid(forcefield, smirks_types_to_change, np.array([0.75, 1.25]))
 likelihood = likelihood_function(dataplex)
-
+dataplex.plot_properties()
 start = time.time()
 predict, stddev = likelihood.evaluate_parameter_set(test_params_one)
 end = time.time()

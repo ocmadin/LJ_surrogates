@@ -10,18 +10,22 @@ from smt.sampling_methods import LHS
 
 
 def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to_change, param_range,
-                        parameter_sets_only=False):
+                        parameter_sets_only=False, nonuniform_ranges=False):
     forcefield = ForceField(filename, allow_cosmetic_attributes=True)
 
     # smirks_types_to_change = ['[#6X4:1]']
     # smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]']
     # smirks_types_to_change = ['[#6X4:1]', '[#1:1]-[#6X4]', '[#8X2H1+0:1]', '[#1:1]-[#8]']
 
-    n_dim = len(smirks_types_to_change) * 2
-    lj_sample_ranges = []
-    for i in range(n_dim):
-        lj_sample_ranges.append(param_range)
-    lj_sample_ranges = np.asarray(lj_sample_ranges)
+
+    if nonuniform_ranges is True:
+        lj_sample_ranges = np.asarray(param_range)
+    else:
+        n_dim = len(smirks_types_to_change) * 2
+        lj_sample_ranges = []
+        for i in range(n_dim):
+            lj_sample_ranges.append(param_range)
+        lj_sample_ranges = np.asarray(lj_sample_ranges)
     sampling = LHS(xlimits=lj_sample_ranges)
     values = sampling(num_samples)
     os.makedirs(output_directory, exist_ok=True)

@@ -67,17 +67,20 @@ class likelihood_function:
         predictions = torch.tensor(x_map).cuda()
         return predictions[:, 0].unsqueeze(-1), predictions[:, 1].unsqueeze(-1)
 
+    def add_prior(self,prior):
+        self.prior = prior
+
     def evaluate_surrogate(self, surrogate):
         with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                 True) and gpytorch.settings.fast_pred_var(True):
-            eval = surrogate[1](surrogate[0](self.parameter_set))
+            eval = surrogate(self.parameter_set)
         return eval.mean, eval.variance
 
     def evaluate_surrogate_explicit_params(self, surrogate, parameter_set):
         self.parameter_set = parameter_set
         with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                 True) and gpytorch.settings.fast_pred_var(True):
-            eval = surrogate[1](surrogate[0](self.parameter_set))
+            eval = surrogate(self.parameter_set)
         return eval.mean, eval.variance
 
     def evaluate_surrogate_gpflow(self, surrogate, parameter_set):
@@ -91,17 +94,40 @@ class likelihood_function:
 
     def pyro_model(self):
         # Place priors on the virtual site charges increments and distance.
+
+        # parameters = pyro.sample(
+        #     "parameters",
+        #     pyro.distributions.Normal(
+        #         # Use a normal distribution centered at one and with a sigma of 0.5
+        #         # to stop the distance collapsing to 0 or growing too large.
+        #         loc=self.flat_parameters,
+        #         scale=self.flat_parameters * 0.1,
+        #     )
+        # )
+
+        # parameters = pyro.sample(
+        #     "parameters",
+        #     TruncatedNormal(
+        #         # Use a normal distribution centered at one and with a sigma of 0.5
+        #         # to stop the distance collapsing to 0 or growing too large.
+        #         loc=self.flat_parameters,
+        #         scale=self.flat_parameters * 5,
+        #         min_x0=0
+        #     )
+        # )
+
         parameters = pyro.sample(
             "parameters",
-            pyro.distributions.Normal(
-                # Use a normal distribution centered at one and with a sigma of 0.5
-                # to stop the distance collapsing to 0 or growing too large.
-                loc=self.flat_parameters,
-                scale=self.flat_parameters * 0.1,
+            pyro.distributions.Uniform(
+                low=self.flat_parameters*0.75,
+                high=self.flat_parameters*1.25,
             )
         )
 
+
+
         predictions, predicted_uncertainties = self.evaluate_parameter_set(parameters)
+        # print(predicted_uncertainties)
         uncertainty = pyro.deterministic(
             "uncertainty", torch.sqrt(torch.square(self.uncertainty_values) + torch.square(predicted_uncertainties)))
         # uncertainty = pyro.deterministic(
@@ -121,7 +147,7 @@ class likelihood_function:
 
     def sample(self, samples, step_size=0.001, max_tree_depth=10, num_chains=1):
         # Train the parameters and plot the sampled traces.
-        nuts_kernel = NUTS(self.pyro_model, step_size=step_size, max_tree_depth=max_tree_depth)
+        nuts_kernel = NUTS(self.pyro_model, step_size=step_size, max_tree_depth=max_tree_depth,max_plate_nesting=5)
         initial_params = {'parameters': torch.tile(self.flat_parameters, (num_chains, 1))}
 
         self.mcmc = MCMC(nuts_kernel, initial_params=initial_params, num_samples=samples,
@@ -129,7 +155,18 @@ class likelihood_function:
         # self.mcmc = MCMC(nuts_kernel, num_samples=samples, num_warmup=int(np.floor(samples/5)), num_chains=1)
 
         self.mcmc.run()
-        self.mcmc.summary()
         self.samples = self.mcmc.get_samples()
 
         return self.mcmc
+
+
+
+class TruncatedNormal(pyro.distributions.Rejector):
+    def __init__(self, loc, scale, min_x0):
+        propose = pyro.distributions.Normal(loc, scale)
+
+        def log_prob_accept(x):
+            return (x > min_x0).type_as(x).log()
+
+        log_scale = torch.log(1 - pyro.distributions.Normal(loc, scale).cdf(min_x0))
+        super(TruncatedNormal, self).__init__(propose, log_prob_accept, log_scale)

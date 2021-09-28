@@ -23,6 +23,6 @@ def plot_triangle(params, likelihood, ranges):
             if i == j:
                 pairplot.axes[i][j].axvline(ranges[i, 0], ls='--', color='k')
                 pairplot.axes[i][j].axvline(ranges[i, 1], ls='--', color='k')
-
-    pairplot.savefig(os.path.join('result/figures', 'trace.png'), dpi=300)
+    plt.tight_layout()
+    pairplot.savefig(os.path.join('result/figures', 'trace_with_sampling_boundaries.png'), dpi=300)
     plt.close()
