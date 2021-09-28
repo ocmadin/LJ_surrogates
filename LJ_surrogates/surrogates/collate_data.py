@@ -5,12 +5,15 @@ import os
 import json
 import numpy as np
 import torch
-from LJ_surrogates.surrogates.surrogate import GPSurrogateModel, build_surrogate_lightweight
+from LJ_surrogates.surrogates.surrogate import GPSurrogateModel, build_surrogate_lightweight, build_surrogates_loo_cv
 import matplotlib.pyplot as plt
+import tqdm
+import copy
 
 
 def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath):
     data = []
+    counter = 0
     for i in range(int(len(os.listdir(directory)) / 2)):
         if os.path.isfile(os.path.join(directory, 'force_field_' + str(i) + '.offxml')) and os.path.isfile(
                 os.path.join(directory, 'estimated_data_set_' + str(i) + '.json')):
@@ -20,6 +23,7 @@ def collate_physical_property_data(directory, smirks, initial_forcefield, proper
             parameters = get_force_field_parameters(forcefield, smirks)
             if len(results) != 0:
                 data.append([results, parameters])
+    print(f'Started with {i+1} datasets, removed {i+1-len(data)} empty dataset(s)')
     initial_forcefield = ForceField(initial_forcefield)
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
     properties = PhysicalPropertyDataSet.from_json(properties_filepath)
@@ -69,7 +73,6 @@ class ParameterSetDataMultiplex:
             for i in range(len(self.parameters)):
                 if dataset.parameters[i].smirks != self.parameters[i].smirks:
                     equality = False
-                    print('!!!')
             if equality is True:
                 multi_data.append(dataset)
         self.multi_data = multi_data
@@ -94,22 +97,31 @@ class ParameterSetDataMultiplex:
                 multi_data.append(dataset)
         self.multi_data = multi_data
 
+    def prune_bad_densities(self):
+        print('Eliminating Bad Density Measurements...')
+        before = len(self.multi_data)
+        for i,property in enumerate(self.properties.properties):
+            if self.property_labels[i].endswith('Density'):
+                to_pop = []
+                for j,measurement in enumerate(self.multi_data):
+                    if measurement.property_measurements.properties[i].value.m <= 0.1 * property.value.m:
+                        to_pop.append(j)
+                for pop in sorted(to_pop,reverse=True):
+                    del self.multi_data[pop]
+        after = len(self.multi_data)
+        print(f"Removed {before-after} datasets due to bad density measurments")
     def align_property_data(self):
         parameter_labels = []
         for parameter in self.parameters:
             parameter_labels.append(parameter.smirks + '_epsilon')
             parameter_labels.append(parameter.smirks + '_rmin_half')
-        all_parameters = []
-        for data in self.multi_data:
-            parameters = []
-            for parameter in data.parameters:
-                parameters.append(parameter.epsilon._value)
-                parameters.append(parameter.rmin_half._value)
-            all_parameters.append(parameters)
         property_labels = []
         for property in self.properties.properties:
             property_type = str(type(property)).split(sep='.')[-1].rstrip("'>")
             property_labels.append(str(property.substance) + "_" + property_type)
+        self.parameter_labels = parameter_labels
+        self.property_labels = property_labels
+        self.prune_bad_densities()
         property_measurements = []
         property_uncertainties = []
         for data in self.multi_data:
@@ -120,17 +132,23 @@ class ParameterSetDataMultiplex:
                 uncertainties.append(property.uncertainty.m)
             property_measurements.append(measurements)
             property_uncertainties.append(uncertainties)
+        all_parameters = []
+        for data in self.multi_data:
+            parameters = []
+            for parameter in data.parameters:
+                parameters.append(parameter.epsilon._value)
+                parameters.append(parameter.rmin_half._value)
+            all_parameters.append(parameters)
         all_parameters = np.asarray(all_parameters)
         property_measurements = np.asarray(property_measurements)
         property_uncertainties = np.asarray(property_uncertainties)
 
-        self.parameter_labels = parameter_labels
-        self.property_labels = property_labels
+
         self.parameter_values = pandas.DataFrame(all_parameters, columns=parameter_labels)
         self.property_measurements = pandas.DataFrame(property_measurements, columns=property_labels)
         self.property_uncertainties = pandas.DataFrame(property_uncertainties, columns=property_labels)
 
-    def build_surrogates(self):
+    def build_surrogates(self,do_cross_validation=True):
         surrogates = []
 
         if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
@@ -138,15 +156,20 @@ class ParameterSetDataMultiplex:
         else:
             num_surrogates = self.property_measurements.shape[1]
         surrogate_measurements = self.property_measurements.values.transpose()
-        for i in range(num_surrogates):
+        surrogate_uncertainties = self.property_uncertainties.values.transpose()
+        for i in tqdm.tqdm(range(num_surrogates),ascii=True,desc='Building and Validating Surrogates'):
             individual_property_measurements = surrogate_measurements[i].reshape(
                 (surrogate_measurements[0].shape[0], 1))
+            individual_property_uncertainties = surrogate_uncertainties[i].reshape(
+                (surrogate_uncertainties[0].shape[0], 1))
             # model = GPSurrogateModel(parameter_data=self.parameter_values.values,
             #                          property_data=individual_property_measurements)
-            # model.build_surrogate_GPytorch()
+            # model.build_surrogate_gpflow()
             # model.model.train_targets = model.model.train_targets.detach()
-            model = build_surrogate_lightweight(self.parameter_values.values,individual_property_measurements)
-            model[0].train_targets = model[0].train_targets.detach()
+            model = build_surrogate_lightweight(self.parameter_values.values,individual_property_measurements, individual_property_uncertainties)
+            if do_cross_validation is True:
+                build_surrogates_loo_cv(self.parameter_values.values,individual_property_measurements,individual_property_uncertainties,self.property_labels[i])
+            model.train_targets = model.train_targets.detach()
             surrogates.append(model)
 
         self.surrogates = surrogates
@@ -195,10 +218,16 @@ def get_training_data_new(data, properties, parameters):
     data_list = []
     for datum in data:
         data_list.append(ParameterSetData(datum))
+    print('Collecting and Preparing Data...')
     dataplex = ParameterSetDataMultiplex(data_list, properties, parameters)
+    before = copy.deepcopy(len(dataplex.multi_data))
     dataplex.check_parameters()
     dataplex.check_properties()
+    after = len(dataplex.multi_data)
+    print(f'Removed {before-after} incomplete or errored datasets')
     dataplex.align_property_data()
+    dataplex.plot_properties()
+    print(f'Proceeding to build surrogates with {len(dataplex.multi_data)} Datasets')
     dataplex.build_surrogates()
     return dataplex
 

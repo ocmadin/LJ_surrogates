@@ -1,0 +1,60 @@
+{
+  "@type": "openff.evaluator.datasets.datasets.PhysicalPropertyDataSet",
+  "properties": [
+    {
+      "@type": "openff.evaluator.properties.density.Density",
+      "gradients": [],
+      "id": "65b6eebf969040cc8aa7fbfd90b710af",
+      "phase": 2,
+      "source": {
+        "@type": "openff.evaluator.datasets.provenance.CalculationSource",
+        "fidelity": "SimulationLayer",
+        "provenance": "{\"protocol_schemas\": [{\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|build_coordinates\", \"type\": \"BuildCoordinatesPackmol\", \"inputs\": {\".allow_merging\": true, \".max_molecules\": 1000, \".count_exact_amount\": true, \".mass_density\": {\"value\": 0.95, \"unit\": \"g / ml\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \".box_aspect_ratio\": [1.0, 1.0, 1.0], \".substance\": {\"components\": [{\"smiles\": \"[Ar]\", \"role\": {\"value\": \"solv\", \"@type\": \"openff.evaluator.substances.components.Component.Role\"}, \"@type\": \"openff.evaluator.substances.components.Component\"}], \"amounts\": {\"[Ar]{solv}\": [{\"value\": 1.0, \"@type\": \"openff.evaluator.substances.amounts.MoleFraction\"}]}, \"@type\": \"openff.evaluator.substances.substances.Substance\"}, \".tolerance\": {\"value\": 2.0, \"unit\": \"\\u00c5\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \".verbose_packmol\": false, \".retain_packmol_files\": false}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}, {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|energy_minimisation\", \"type\": \"OpenMMEnergyMinimisation\", \"inputs\": {\".allow_merging\": true, \".input_coordinate_file\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|build_coordinates.coordinate_file_path\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".parameterized_system\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|assign_parameters.parameterized_system\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".tolerance\": {\"value\": 10.0, \"unit\": \"kJ / mol\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \".max_iterations\": 0, \".enable_pbc\": true}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}, {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|equilibration_simulation\", \"type\": \"OpenMMSimulation\", \"inputs\": {\".allow_merging\": true, \".steps_per_iteration\": 100000, \".total_number_of_iterations\": 1, \".output_frequency\": 5000, \".checkpoint_frequency\": 10, \".timestep\": {\"value\": 2.0, \"unit\": \"fs\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \".thermodynamic_state\": {\"temperature\": {\"value\": 89.13, \"unit\": \"K\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"pressure\": {\"value\": 9873.108, \"unit\": \"kPa\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"@type\": \"openff.evaluator.thermodynamics.ThermodynamicState\"}, \".ensemble\": {\"value\": \"NPT\", \"@type\": \"openff.evaluator.thermodynamics.Ensemble\"}, \".thermostat_friction\": {\"value\": 1.0, \"unit\": \"1 / ps\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \".input_coordinate_file\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|energy_minimisation.output_coordinate_file\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".parameterized_system\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|assign_parameters.parameterized_system\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".enable_pbc\": true, \".allow_gpu_platforms\": true, \".high_precision\": false, \".gradient_parameters\": []}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}, {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group\", \"type\": \"ConditionalGroup\", \"inputs\": {\".allow_merging\": true, \".conditions\": [], \".max_iterations\": 100}, \"protocol_schemas\": {\"65b6eebf969040cc8aa7fbfd90b710af|production_simulation\": {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|production_simulation\", \"type\": \"OpenMMSimulation\", \"inputs\": {\".allow_merging\": true, \".steps_per_iteration\": 1000000, \".total_number_of_iterations\": 1, \".output_frequency\": 2000, \".checkpoint_frequency\": 10, \".timestep\": {\"value\": 2.0, \"unit\": \"fs\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \".thermodynamic_state\": {\"temperature\": {\"value\": 89.13, \"unit\": \"K\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"pressure\": {\"value\": 9873.108, \"unit\": \"kPa\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"@type\": \"openff.evaluator.thermodynamics.ThermodynamicState\"}, \".ensemble\": {\"value\": \"NPT\", \"@type\": \"openff.evaluator.thermodynamics.Ensemble\"}, \".thermostat_friction\": {\"value\": 1.0, \"unit\": \"1 / ps\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \".input_coordinate_file\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|equilibration_simulation.output_coordinate_file\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".parameterized_system\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|assign_parameters.parameterized_system\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".enable_pbc\": true, \".allow_gpu_platforms\": true, \".high_precision\": false, \".gradient_parameters\": []}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}, \"65b6eebf969040cc8aa7fbfd90b710af|average_density\": {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|average_density\", \"type\": \"AverageObservable\", \"inputs\": {\".allow_merging\": true, \".bootstrap_iterations\": 250, \".bootstrap_sample_size\": 1.0, \".thermodynamic_state\": {\"temperature\": {\"value\": 89.13, \"unit\": \"K\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"pressure\": {\"value\": 9873.108, \"unit\": \"kPa\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"@type\": \"openff.evaluator.thermodynamics.ThermodynamicState\"}, \".potential_energies\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|production_simulation.observables[PotentialEnergy]\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".observable\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|production_simulation.observables[Density]\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".divisor\": 1.0}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolGroupSchema\"}, {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|decorrelate_trajectory\", \"type\": \"DecorrelateTrajectory\", \"inputs\": {\".allow_merging\": true, \".time_series_statistics\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|average_density.time_series_statistics\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".input_coordinate_file\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|production_simulation.output_coordinate_file\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".input_trajectory_path\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|production_simulation.trajectory_file_path\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}, {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|decorrelate_observables\", \"type\": \"DecorrelateObservables\", \"inputs\": {\".allow_merging\": true, \".time_series_statistics\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|average_density.time_series_statistics\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".input_observables\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|production_simulation.observables\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}, {\"id\": \"65b6eebf969040cc8aa7fbfd90b710af|assign_parameters\", \"type\": \"BuildSmirnoffSystem\", \"inputs\": {\".allow_merging\": true, \".force_field_path\": \"working_directory/SimulationLayer/3ad7437e179f4c8185075b3acccfc0ef/e62b4f635d9f4c0cbfa2898e1b14e5ee\", \".coordinate_file_path\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|build_coordinates.coordinate_file_path\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \".substance\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|build_coordinates.output_substance\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}}, \"@type\": \"openff.evaluator.workflow.schemas.ProtocolSchema\"}], \"final_value_source\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|average_density.value\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \"outputs_to_store\": {\"full_system\": {\"substance\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|build_coordinates.output_substance\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \"thermodynamic_state\": {\"temperature\": {\"value\": 89.13, \"unit\": \"K\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"pressure\": {\"value\": 9873.108, \"unit\": \"kPa\", \"@type\": \"openff.evaluator.unit.Quantity\"}, \"@type\": \"openff.evaluator.thermodynamics.ThermodynamicState\"}, \"property_phase\": 2, \"source_calculation_id\": {\"@type\": \"openff.evaluator.attributes.attributes.PlaceholderValue\"}, \"force_field_id\": {\"@type\": \"openff.evaluator.attributes.attributes.PlaceholderValue\"}, \"coordinate_file_name\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|production_simulation.output_coordinate_file\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \"trajectory_file_name\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|decorrelate_trajectory.output_trajectory_path\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \"observables\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|decorrelate_observables.output_observables\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \"statistical_inefficiency\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|conditional_group/65b6eebf969040cc8aa7fbfd90b710af|average_density.time_series_statistics.statistical_inefficiency\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \"number_of_molecules\": {\"full_path\": \"65b6eebf969040cc8aa7fbfd90b710af|build_coordinates.output_number_of_molecules\", \"@type\": \"openff.evaluator.workflow.utils.ProtocolPath\"}, \"@type\": \"openff.evaluator.storage.data.StoredSimulationData\"}}, \"@type\": \"openff.evaluator.workflow.schemas.WorkflowSchema\"}"
+      },
+      "substance": {
+        "@type": "openff.evaluator.substances.substances.Substance",
+        "amounts": {
+          "[Ar]{solv}": [
+            {
+              "@type": "openff.evaluator.substances.amounts.MoleFraction",
+              "value": 1.0
+            }
+          ]
+        },
+        "components": [
+          {
+            "@type": "openff.evaluator.substances.components.Component",
+            "role": {
+              "@type": "openff.evaluator.substances.components.Component.Role",
+              "value": "solv"
+            },
+            "smiles": "[Ar]"
+          }
+        ]
+      },
+      "thermodynamic_state": {
+        "@type": "openff.evaluator.thermodynamics.ThermodynamicState",
+        "pressure": {
+          "@type": "openff.evaluator.unit.Quantity",
+          "unit": "kPa",
+          "value": 9873.108
+        },
+        "temperature": {
+          "@type": "openff.evaluator.unit.Quantity",
+          "unit": "K",
+          "value": 89.13
+        }
+      },
+      "uncertainty": {
+        "@type": "openff.evaluator.unit.Quantity",
+        "unit": "g / ml",
+        "value": 0.0003824154459628969
+      },
+      "value": {
+        "@type": "openff.evaluator.unit.Quantity",
+        "unit": "g / ml",
+        "value": 0.7503526373681149
+      }
+    }
+  ]
+}
