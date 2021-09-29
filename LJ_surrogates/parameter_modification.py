@@ -10,7 +10,7 @@ from smt.sampling_methods import LHS
 
 
 def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to_change, param_range,
-                        parameter_sets_only=False, nonuniform_ranges=False):
+                        parameter_sets_only=False, nonuniform_ranges=False, absolute_ranges=False):
     forcefield = ForceField(filename, allow_cosmetic_attributes=True)
 
     # smirks_types_to_change = ['[#6X4:1]']
@@ -36,7 +36,7 @@ def vary_parameters_lhc(filename, num_samples, output_directory, smirks_types_to
         counter = 0
         for lj in lj_params:
             if lj.smirks in smirks_types_to_change:
-                if nonuniform_ranges is True:
+                if absolute_ranges is True:
                     lj.epsilon = reshape_values[counter, 0] * unit.kilocalorie_per_mole
                     lj.rmin_half = reshape_values[counter, 1] * unit.angstrom
                 else:
