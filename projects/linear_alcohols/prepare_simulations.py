@@ -8,9 +8,9 @@ import argparse
 
 
 def main(n_samples, output_directory, forcefield, data_filepath):
-    param_range = [0.7,1.3]
-    smirks = ['[#6X4:1]', '[#1:1]-[#6X4]', '[#8X2H1+0:1]', '[#1:1]-[#8]',
-                              '[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]']
+    param_range = [[0.95, 1.25], [0.95, 1.05], [0.95, 1.65], [0.95, 1.05], [0.5, 1.05], [0.9, 1.1], [0.9, 1.1], [0.95, 1.05], [0.95, 1.05], [0.95, 1.05]]
+    smirks = ['[#1:1]-[#6X4]', '[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]', '[#1:1]-[#8]', '[#6X4:1]',
+                              '[#8X2H1+0:1]']
     if data_filepath.endswith('.csv'):
         data_csv = pandas.read_csv(data_filepath)
         data_csv['Id'] = data_csv['Id'].astype('string')
@@ -21,7 +21,7 @@ def main(n_samples, output_directory, forcefield, data_filepath):
         raise TypeError('File should either be a dataset in the format of a csv or json')
     data_set.json('test-set-collection.json')
 
-    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, np.asarray(param_range))
+    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, np.asarray(param_range), nonuniform_ranges=True)
 
     for folder in os.listdir(output_directory):
         shutil.copy2('test-set-collection.json', os.path.join(output_directory, folder))
