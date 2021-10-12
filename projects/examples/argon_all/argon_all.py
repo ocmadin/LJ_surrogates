@@ -4,6 +4,7 @@ from LJ_surrogates.surrogates.collate_data import collate_physical_property_data
 from LJ_surrogates.parameter_modification import vary_parameters_lhc, create_evaluation_grid
 import time
 from LJ_surrogates.sampling.likelihood import likelihood_function
+from LJ_surrogates.plotting.plotting import plot_triangle
 import torch
 import pickle
 import pandas
@@ -19,7 +20,7 @@ device = torch.device('cuda')
 path = '../../../data/argon_all'
 smirks_types_to_change = ['[#18:1]']
 forcefield = 'openff-1-3-0-argon.offxml'
-dataset_json = 'argon_all.json'
+dataset_json = 'argon_all_new.json'
 
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
@@ -57,7 +58,7 @@ start = time.time()
 predictions_map = likelihood.evaluate_parameter_set_map(test_params_one)
 end = time.time()
 print(f'Without map: {end - start} seconds')
-mcmc = likelihood.sample(samples=1000)
+mcmc = likelihood.sample(samples=5000)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
 
 
@@ -66,7 +67,18 @@ params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
 
 os.makedirs(os.path.join('result','figures'),exist_ok=True)
 np.save(os.path.join('result','params.npy'), params)
+ranges = dataplex.export_sampling_ranges()
+sampled_ranges = []
+for i in range(params.shape[1]):
+    low_index = int(np.floor(0.025*len(params[:,i])))
+    high_index = int(np.floor(0.975*len(params[:,i])))
+    sorted_samples = sorted(params[:,i])
+    sampled_ranges.append([sorted_samples[low_index],sorted_samples[high_index]])
 
+# likelihood.evaluate_surrogate_gpflow(likelihood.surrogates[0],test_params)
+os.makedirs(os.path.join('result', 'figures'), exist_ok=True)
+np.save(os.path.join('result', 'params.npy'), params)
+plot_triangle(params, likelihood, ranges)
 df = pandas.DataFrame(params, columns=likelihood.flat_parameter_names)
 pairplot = seaborn.pairplot(df, kind='kde', corner=True)
 pairplot.map_upper(seaborn.kdeplot, levels=4, color=".2")

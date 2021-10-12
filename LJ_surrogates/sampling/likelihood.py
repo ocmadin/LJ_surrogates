@@ -95,15 +95,15 @@ class likelihood_function:
     def pyro_model(self):
         # Place priors on the virtual site charges increments and distance.
 
-        # parameters = pyro.sample(
-        #     "parameters",
-        #     pyro.distributions.Normal(
-        #         # Use a normal distribution centered at one and with a sigma of 0.5
-        #         # to stop the distance collapsing to 0 or growing too large.
-        #         loc=self.flat_parameters,
-        #         scale=self.flat_parameters * 0.1,
-        #     )
-        # )
+        parameters = pyro.sample(
+            "parameters",
+            pyro.distributions.Normal(
+                # Use a normal distribution centered at one and with a sigma of 0.5
+                # to stop the distance collapsing to 0 or growing too large.
+                loc=self.flat_parameters,
+                scale=self.flat_parameters * 0.1,
+            )
+        )
 
         # parameters = pyro.sample(
         #     "parameters",
@@ -116,13 +116,13 @@ class likelihood_function:
         #     )
         # )
 
-        parameters = pyro.sample(
-            "parameters",
-            pyro.distributions.Uniform(
-                low=self.flat_parameters*0.75,
-                high=self.flat_parameters*1.25,
-            )
-        )
+        # parameters = pyro.sample(
+        #     "parameters",
+        #     pyro.distributions.Uniform(
+        #         low=self.flat_parameters*0.5,
+        #         high=self.flat_parameters*1.5,
+        #     )
+        # )
 
 
 
@@ -151,13 +151,13 @@ class likelihood_function:
         initial_params = {'parameters': torch.tile(self.flat_parameters, (num_chains, 1))}
 
         self.mcmc = MCMC(nuts_kernel, initial_params=initial_params, num_samples=samples,
-                         warmup_steps=int(np.floor(samples / 5)), num_chains=num_chains, mp_context='spawn')
+                         warmup_steps=int(np.floor(samples / 20)), num_chains=num_chains, mp_context='spawn')
         # self.mcmc = MCMC(nuts_kernel, num_samples=samples, num_warmup=int(np.floor(samples/5)), num_chains=1)
 
         self.mcmc.run()
         self.samples = self.mcmc.get_samples()
 
-        return self.mcmc
+        return self.mcmc, self.flat_parameters
 
 
 
@@ -168,5 +168,6 @@ class TruncatedNormal(pyro.distributions.Rejector):
         def log_prob_accept(x):
             return (x > min_x0).type_as(x).log()
 
-        log_scale = torch.log(1 - pyro.distributions.Normal(loc, scale).cdf(min_x0))
+        with torch.no_grad():
+            log_scale = torch.log(1 - pyro.distributions.Normal(loc, scale).cdf(min_x0))
         super(TruncatedNormal, self).__init__(propose, log_prob_accept, log_scale)

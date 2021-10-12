@@ -200,7 +200,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
             #     batch_shape=torch.Size([train_x.shape[0]]))
             self.covar_module = gpytorch.kernels.ScaleKernel(
                 gpytorch.kernels.RBFKernel(batch_shape=torch.Size([train_x.shape[0]])),
-                batch_shape=torch.Size([train_x.shape[0]]))
+                batch_shape=torch.Size([train_x.shape[0]]),ard_num_dims=train_x.shape[2])
                 # initialize likelihood and model
 
         def forward(self, x):

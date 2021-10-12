@@ -4,6 +4,7 @@ from LJ_surrogates.surrogates.collate_data import collate_physical_property_data
 from LJ_surrogates.parameter_modification import vary_parameters_lhc, create_evaluation_grid
 import time
 from LJ_surrogates.sampling.likelihood import likelihood_function
+from LJ_surrogates.surrogates.surrogate import compute_surrogate_gradients
 import torch
 import pickle
 import pandas
@@ -27,8 +28,8 @@ dataset_json = 'argon_single.json'
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json)
 dataplex.plot_properties()
-test_params = vary_parameters_lhc(forcefield, 2, '.', smirks_types_to_change, [0.9, 1.1],
-                                  parameter_sets_only=True).transpose()
+test_params = vary_parameters_lhc(forcefield, 20, '.', smirks_types_to_change, [[0.18062470551820903, 0.48984215139407744], [1.836245579044131, 2.039671726465781]],
+                                  parameter_sets_only=True,nonuniform_ranges=True).transpose()
 test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).to(
     device=device).detach()
 grid = create_evaluation_grid(forcefield, smirks_types_to_change, np.array([0.75, 1.25]))
@@ -61,15 +62,31 @@ start = time.time()
 predictions_map = likelihood.evaluate_parameter_set_map(test_params_one)
 end = time.time()
 print(f'Without map: {end - start} seconds')
-mcmc = likelihood.sample(samples=5000, step_size=0.001, max_tree_depth=5, num_chains=1)
+mcmc, initial_parameters = likelihood.sample(samples=1000, step_size=0.001, max_tree_depth=5, num_chains=1)
 mcmc._samples['parameters'] = mcmc._samples['parameters'].cpu()
 summary = summary(mcmc._samples)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
+params = np.append(params,initial_parameters.cpu().numpy(),axis=0)
 ranges = dataplex.export_sampling_ranges()
+sampled_ranges = []
+for i in range(params.shape[1]):
+    low_index = int(np.floor(0.025*len(params[:,i])))
+    high_index = int(np.floor(0.975*len(params[:,i])))
+    sorted_samples = sorted(params[:,i])
+    sampled_ranges.append([sorted_samples[low_index],sorted_samples[high_index]])
+
+
 # likelihood.evaluate_surrogate_gpflow(likelihood.surrogates[0],test_params)
 os.makedirs(os.path.join('result', 'figures'), exist_ok=True)
 np.save(os.path.join('result', 'params.npy'), params)
 plot_triangle(params, likelihood, ranges)
+
+gradients = compute_surrogate_gradients(dataplex.surrogates[0],dataplex.parameter_values.to_numpy()[0],0.01)
+grad_vs_range = []
+dist_vs_samples = []
+for i in range(len(gradients)):
+    grad_vs_range.append(abs(gradients[i].detach().cpu().numpy())/(ranges[i][1] - ranges[i][0]))
+    dist_vs_samples.append((sampled_ranges[i][1] - sampled_ranges[i][0])/(ranges[i][1] - ranges[i][0]))
 
 plt.clf()
 for i, surrogate in enumerate(likelihood.surrogates):
@@ -97,6 +114,7 @@ for i, surrogate in enumerate(likelihood.surrogates):
     plt.ylabel('[#18:1] rmin_half (angstroms)')
     plt.title(
         f'Argon density uncertainties (g/ml) \n (Experimental value {expt_uncertainty} g/ml @ {expt_temperature} K, {expt_pressure} atm)')
+    # plt.title('Latin Hypercube Sampling of argon LJ parameters')
     plt.savefig(os.path.join('result/figures', f'surrogate_uncertainties_{expt_temperature}_K_{expt_pressure}_atm.png'),
                 dpi=300)
     plt.show()

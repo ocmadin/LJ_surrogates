@@ -18,11 +18,11 @@ from LJ_surrogates.plotting.plotting import plot_triangle
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/alcohol_alkane/linear_alcohols'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/alcohol_alkane/linear_alcohols_2nd_refinement'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]', '[#1:1]-[#8]', '[#6X4:1]',
           '[#8X2H1+0:1]']
 forcefield = 'openff-1-3-0.offxml'
-dataset_json = 'pure-alcohols-old.json'
+dataset_json = 'linear_alcohols_refined_new.json'
 
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
@@ -46,9 +46,9 @@ start = time.time()
 predictions_map = likelihood.evaluate_parameter_set_map(test_params_one)
 end = time.time()
 print(f'Without map: {end - start} seconds')
-mcmc = likelihood.sample(samples=10000,step_size=0.0001,max_tree_depth=5,num_chains=1)
+mcmc,initial_parameters = likelihood.sample(samples=100000,step_size=0.0001,max_tree_depth=5,num_chains=1)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
-
+params = np.append(params,initial_parameters.cpu().numpy(),axis=0)
 
 # likelihood.evaluate_surrogate_gpflow(likelihood.surrogates[0],test_params)
 
@@ -56,7 +56,7 @@ params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
 os.makedirs(os.path.join('result','figures'),exist_ok=True)
 np.save(os.path.join('result','params.npy'), params)
 ranges = dataplex.export_sampling_ranges()
-df = pandas.DataFrame(params, columns=likelihood.flat_parameter_names)
+df = pandas.DataFrame(params[:-1], columns=likelihood.flat_parameter_names)
 wrapper = textwrap.TextWrapper(width=25)
 columns = {}
 for i,column in enumerate(df.columns):

@@ -1,8 +1,11 @@
+import numpy
 import seaborn
 import matplotlib.pyplot as plt
 import pandas
 import textwrap
 import os
+import scipy.stats.distributions
+import numpy as np
 
 
 def plot_sampling_boundaries_1D(x_values, ranges, **kwargs):
@@ -11,7 +14,8 @@ def plot_sampling_boundaries_1D(x_values, ranges, **kwargs):
 
 
 def plot_triangle(params, likelihood, ranges):
-    df = pandas.DataFrame(params, columns=likelihood.flat_parameter_names)
+    df = pandas.DataFrame(params[:-1], columns=likelihood.flat_parameter_names)
+    df2 = pandas.DataFrame(np.expand_dims(params[-1],axis=0), columns=likelihood.flat_parameter_names)
     wrapper = textwrap.TextWrapper(width=25)
     columns = {}
     for i, column in enumerate(df.columns):
@@ -23,6 +27,8 @@ def plot_triangle(params, likelihood, ranges):
             if i == j:
                 pairplot.axes[i][j].axvline(ranges[i, 0], ls='--', color='k')
                 pairplot.axes[i][j].axvline(ranges[i, 1], ls='--', color='k')
+                pairplot.axes[i][j].axvline(scipy.stats.distributions.norm(df2.values[0][i],df2.values[0][i]/10).ppf(0.025), ls='--',color='r')
+                pairplot.axes[i][j].axvline(scipy.stats.distributions.norm(df2.values[0][i],df2.values[0][i]/10).ppf(0.975), ls='--',color='r')
     plt.tight_layout()
     pairplot.savefig(os.path.join('result/figures', 'trace_with_sampling_boundaries.png'), dpi=300)
     plt.close()
