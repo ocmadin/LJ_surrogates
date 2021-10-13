@@ -11,7 +11,7 @@ import tqdm
 import copy
 
 
-def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath):
+def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath, device):
     data = []
     counter = 0
     for i in range(int(len(os.listdir(directory)) / 2)):
@@ -27,7 +27,7 @@ def collate_physical_property_data(directory, smirks, initial_forcefield, proper
     initial_forcefield = ForceField(initial_forcefield)
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
     properties = PhysicalPropertyDataSet.from_json(properties_filepath)
-    dataplex = get_training_data_new(data, properties, initial_parameters)
+    dataplex = get_training_data_new(data, properties, initial_parameters, device)
     # properties_all = get_training_data(data)
     return dataplex
 
@@ -57,11 +57,12 @@ class ParameterSetData:
 
 
 class ParameterSetDataMultiplex:
-    def __init__(self, ParameterDataSetList, InitialProperties, InitialParameters):
+    def __init__(self, ParameterDataSetList, InitialProperties, InitialParameters, device):
         self.multi_data = ParameterDataSetList
         self.parameters = self.multi_data[0].parameters
         self.properties = InitialProperties
         self.initial_parameters = InitialParameters
+        self.device = device
 
     def align_data(self):
         pass
@@ -166,7 +167,7 @@ class ParameterSetDataMultiplex:
             #                          property_data=individual_property_measurements)
             # model.build_surrogate_gpflow()
             # model.model.train_targets = model.model.train_targets.detach()
-            model = build_surrogate_lightweight(self.parameter_values.values,individual_property_measurements, individual_property_uncertainties)
+            model = build_surrogate_lightweight(self.parameter_values.values,individual_property_measurements, individual_property_uncertainties, self.device)
             if do_cross_validation is True:
                 build_surrogates_loo_cv(self.parameter_values.values,individual_property_measurements,individual_property_uncertainties,self.property_labels[i])
             model.train_targets = model.train_targets.detach()
@@ -213,13 +214,13 @@ class ParameterSetDataMultiplex:
             plt.clf()
 
 
-def get_training_data_new(data, properties, parameters):
+def get_training_data_new(data, properties, parameters, device):
 
     data_list = []
     for datum in data:
         data_list.append(ParameterSetData(datum))
     print('Collecting and Preparing Data...')
-    dataplex = ParameterSetDataMultiplex(data_list, properties, parameters)
+    dataplex = ParameterSetDataMultiplex(data_list, properties, parameters, device)
     before = copy.deepcopy(len(dataplex.multi_data))
     dataplex.check_parameters()
     dataplex.check_properties()

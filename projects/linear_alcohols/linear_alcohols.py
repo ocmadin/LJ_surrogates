@@ -23,16 +23,18 @@ smirks_types_to_change = ['[#1:1]-[#6X4]', '[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]
           '[#8X2H1+0:1]']
 forcefield = 'openff-1-3-0.offxml'
 dataset_json = 'linear_alcohols_refined_new.json'
+device = 'cuda'
 
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
-                                          dataset_json)
+                                          dataset_json, device)
 
 test_params = vary_parameters_lhc(forcefield, 2, '.', smirks_types_to_change, [[0.95, 1.25], [0.95, 1.05], [0.95, 1.65], [0.95, 1.05], [0.5, 1.05], [0.9, 1.1], [0.9, 1.1], [0.95, 1.05], [0.95, 1.05], [0.95, 1.05]],
                                   parameter_sets_only=True, nonuniform_ranges=True).transpose()
 test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).to(
     device=device).detach()
-likelihood = likelihood_function(dataplex)
+# test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).detach()
+likelihood = likelihood_function(dataplex, device)
 
 start = time.time()
 predict, stddev = likelihood.evaluate_parameter_set(test_params_one)
@@ -46,9 +48,11 @@ start = time.time()
 predictions_map = likelihood.evaluate_parameter_set_map(test_params_one)
 end = time.time()
 print(f'Without map: {end - start} seconds')
-mcmc,initial_parameters = likelihood.sample(samples=100000,step_size=0.0001,max_tree_depth=5,num_chains=1)
+mcmc,initial_parameters = likelihood.sample(samples=1000,step_size=0.0001,max_tree_depth=5,num_chains=1)
+# params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
+# params = np.append(params,initial_parameters.cpu().numpy(),axis=0)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
-params = np.append(params,initial_parameters.cpu().numpy(),axis=0)
+params = np.append(params,initial_parameters.numpy(),axis=0)
 
 # likelihood.evaluate_surrogate_gpflow(likelihood.surrogates[0],test_params)
 

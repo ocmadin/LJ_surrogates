@@ -12,11 +12,11 @@ import gpytorch
 import functools
 import time
 import arviz
-
+from multiprocessing import Pool
 
 class likelihood_function:
-    def __init__(self, dataplex):
-        self.cuda = torch.device('cuda')
+    def __init__(self, dataplex, device):
+        self.device = torch.device(device)
         self.surrogates = dataplex.surrogates
         self.experimental_properties = dataplex.properties
         self.parameters = dataplex.initial_parameters
@@ -26,9 +26,9 @@ class likelihood_function:
         for property in self.experimental_properties.properties:
             experiment_vector.append(property.value.m)
             uncertainty_vector.append(property.uncertainty.m)
-        self.experimental_values = torch.tensor(experiment_vector).unsqueeze(-1).to(device=self.cuda)
+        self.experimental_values = torch.tensor(experiment_vector).unsqueeze(-1).to(device=self.device)
         # self.experimental_values = torch.tensor(experiment_vector).unsqueeze(-1)
-        self.uncertainty_values = torch.tensor(uncertainty_vector).unsqueeze(-1).to(device=self.cuda)
+        self.uncertainty_values = torch.tensor(uncertainty_vector).unsqueeze(-1).to(device=self.device)
         # self.uncertainty_values = torch.tensor(uncertainty_vector).unsqueeze(-1)
 
     def flatten_parameters(self):
@@ -42,7 +42,8 @@ class likelihood_function:
         self.flat_parameters = np.asarray(self.flat_parameters)
         # self.flat_parameters = torch.tensor(self.flat_parameters.reshape(self.flat_parameters.shape[0],1).transpose())
         self.flat_parameters = torch.tensor(np.expand_dims(self.flat_parameters, axis=1).transpose()).to(
-            device=self.cuda)
+            device=self.device)
+        # self.flat_parameters = torch.tensor(np.expand_dims(self.flat_parameters, axis=1).transpose())
 
     def evaluate_parameter_set(self, parameter_set):
         self.parameter_set = parameter_set
@@ -54,8 +55,8 @@ class likelihood_function:
             uncertainties_all.append(variance)
         uncertainties_all = torch.cat(uncertainties_all)
         predictions_all = torch.cat(predictions_all)
-        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1).to(device=self.cuda)
-        predictions_all = predictions_all.reshape(predictions_all.shape[0], 1).to(device=self.cuda)
+        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1).to(device=self.device)
+        predictions_all = predictions_all.reshape(predictions_all.shape[0], 1).to(device=self.device)
         # predictions_all = predictions_all.reshape(predictions_all.shape[0], 1)
         # uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1)
 
@@ -64,7 +65,8 @@ class likelihood_function:
     def evaluate_parameter_set_map(self, parameter_set):
         self.parameter_set = parameter_set
         x_map = list(map(self.evaluate_surrogate, self.surrogates))
-        predictions = torch.tensor(x_map).cuda()
+        # predictions = torch.tensor(x_map).cuda()
+        predictions = torch.tensor(x_map)
         return predictions[:, 0].unsqueeze(-1), predictions[:, 1].unsqueeze(-1)
 
     def add_prior(self,prior):
@@ -124,8 +126,6 @@ class likelihood_function:
         #     )
         # )
 
-
-
         predictions, predicted_uncertainties = self.evaluate_parameter_set(parameters)
         # print(predicted_uncertainties)
         uncertainty = pyro.deterministic(
@@ -133,25 +133,30 @@ class likelihood_function:
         # uncertainty = pyro.deterministic(
         #     "uncertainty", self.uncertainty_values)
 
-        return pyro.sample(
-            "predicted_residuals",
-            pyro.distributions.Normal(loc=predictions, scale=uncertainty),
-            obs=self.experimental_values,
-        ).cuda()
 
-        # return pyro.sample(
-        #     "predicted_residuals",
-        #     pyro.distributions.Normal(loc=predictions, scale=uncertainty),
-        #     obs=self.experimental_values,
-        # )
+        if self.device == 'cuda':
+            return pyro.sample(
+                "predicted_residuals",
+                pyro.distributions.Normal(loc=predictions, scale=uncertainty),
+                obs=self.experimental_values,
+            ).cuda()
+        else:
+            return pyro.sample(
+                "predicted_residuals",
+                pyro.distributions.Normal(loc=predictions, scale=uncertainty),
+                obs=self.experimental_values,
+            )
 
     def sample(self, samples, step_size=0.001, max_tree_depth=10, num_chains=1):
         # Train the parameters and plot the sampled traces.
         nuts_kernel = NUTS(self.pyro_model, step_size=step_size, max_tree_depth=max_tree_depth,max_plate_nesting=5)
         initial_params = {'parameters': torch.tile(self.flat_parameters, (num_chains, 1))}
-
+        if samples <= 10000:
+            warmup_steps = int(np.floor(samples / 5))
+        else:
+            warmup_steps = 2000
         self.mcmc = MCMC(nuts_kernel, initial_params=initial_params, num_samples=samples,
-                         warmup_steps=int(np.floor(samples / 20)), num_chains=num_chains, mp_context='spawn')
+                         warmup_steps=warmup_steps, num_chains=num_chains, mp_context='spawn')
         # self.mcmc = MCMC(nuts_kernel, num_samples=samples, num_warmup=int(np.floor(samples/5)), num_chains=1)
 
         self.mcmc.run()

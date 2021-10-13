@@ -19,21 +19,22 @@ from pyro.infer.mcmc.util import summary
 
 gc.collect()
 torch.cuda.empty_cache()
-device = torch.device('cuda')
 path = '../../../data/argon-single-50-small'
 smirks_types_to_change = ['[#18:1]']
 forcefield = 'openff-1-3-0-argon.offxml'
 dataset_json = 'argon_single.json'
+device = 'cuda'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
-                                          dataset_json)
+                                          dataset_json, device)
 dataplex.plot_properties()
 test_params = vary_parameters_lhc(forcefield, 20, '.', smirks_types_to_change, [[0.18062470551820903, 0.48984215139407744], [1.836245579044131, 2.039671726465781]],
                                   parameter_sets_only=True,nonuniform_ranges=True).transpose()
 test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).to(
     device=device).detach()
+# test_params_one = torch.tensor(test_params[:, 0].reshape(test_params[:, 0].shape[0], 1).transpose()).detach()
 grid = create_evaluation_grid(forcefield, smirks_types_to_change, np.array([0.75, 1.25]))
-likelihood = likelihood_function(dataplex)
+likelihood = likelihood_function(dataplex, device)
 
 
 def grid_to_surrogate_2D(grid, surrogate):
@@ -42,8 +43,10 @@ def grid_to_surrogate_2D(grid, surrogate):
 
     for i in range(grid[0].shape[0]):
         for j in range(grid[0].shape[1]):
+            # val = surrogate(
+            #     torch.tensor(np.expand_dims(np.asarray([grid[0][i, j], grid[1][i, j]]), axis=1).transpose()).cuda())
             val = surrogate(
-                torch.tensor(np.expand_dims(np.asarray([grid[0][i, j], grid[1][i, j]]), axis=1).transpose()).cuda())
+                torch.tensor(np.expand_dims(np.asarray([grid[0][i, j], grid[1][i, j]]), axis=1).transpose()).to(device=device))
             value_grid[i, j] = val.mean
             uncertainty_grid[i, j] = val.stddev
 
@@ -57,11 +60,11 @@ duration = end - start
 start = time.time()
 predictions = likelihood.evaluate_parameter_set(test_params_one)
 end = time.time()
-print(f'With map: {end - start} seconds')
+print(f'Without map: {end - start} seconds')
 start = time.time()
 predictions_map = likelihood.evaluate_parameter_set_map(test_params_one)
 end = time.time()
-print(f'Without map: {end - start} seconds')
+print(f'With map: {end - start} seconds')
 mcmc, initial_parameters = likelihood.sample(samples=1000, step_size=0.001, max_tree_depth=5, num_chains=1)
 mcmc._samples['parameters'] = mcmc._samples['parameters'].cpu()
 summary = summary(mcmc._samples)
@@ -81,7 +84,7 @@ os.makedirs(os.path.join('result', 'figures'), exist_ok=True)
 np.save(os.path.join('result', 'params.npy'), params)
 plot_triangle(params, likelihood, ranges)
 
-gradients = compute_surrogate_gradients(dataplex.surrogates[0],dataplex.parameter_values.to_numpy()[0],0.01)
+gradients = compute_surrogate_gradients(dataplex.surrogates[0],dataplex.parameter_values.to_numpy()[0],0.01,device)
 grad_vs_range = []
 dist_vs_samples = []
 for i in range(len(gradients)):
