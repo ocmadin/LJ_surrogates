@@ -193,6 +193,71 @@ def build_surrogate_lightweight(parameter_data, property_data, property_uncertai
     # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
     return model
 
+def build_multisurrogate_lightweight(parameter_data, property_data, property_uncertainties, device):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+
+    # X = torch.tensor(parameter_data)
+    # Y = torch.tensor(property_data.flatten())
+    # Y_err = torch.tensor(property_uncertainties.flatten())
+    class ExactGPModel(gpytorch.models.ExactGP):
+        def __init__(self, train_x, train_y, likelihood):
+            super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
+            self.mean_module = gpytorch.means.ConstantMean()
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=train_x.shape[1]))
+            # self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(lengthscale_constraint=gpytorch.constraints.GreaterThan(0.25)))
+
+        def forward(self, x):
+            mean_x = self.mean_module(x)
+            covar_x = self.covar_module(x)
+            return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+    num_surrogates = property_data.shape[0]
+    models = []
+    likelihoods = []
+    for i in range(num_surrogates):
+        individual_property_measurements = property_data[i].reshape(
+            (property_data[0].shape[0], 1))
+        Y = torch.tensor(individual_property_measurements.flatten()).to(device=cuda)
+        individual_property_uncertainties = property_uncertainties[i].reshape(
+            (property_uncertainties[0].shape[0], 1))
+        Y_err = torch.tensor(individual_property_uncertainties.flatten()).to(device=cuda)
+        likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+        likelihoods.append(likelihood)
+        models.append(ExactGPModel(X, Y, likelihood).cuda())
+
+    model = gpytorch.models.IndependentModelList(*models)
+    likelihood = gpytorch.likelihoods.LikelihoodList(*likelihoods)
+
+    # self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    # self.model = ExactGPModel(self.X, self.Y, self.likelihood)
+    model.train()
+    likelihood.train()
+    training_iter = 1000
+    # Use the adam optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
+
+    # "Loss" for GPs - the marginal log likelihood
+    mll = gpytorch.mlls.SumMarginalLogLikelihood(likelihood, model)
+
+    for i in range(training_iter):
+        # Zero gradients from previous iteration
+        optimizer.zero_grad()
+        # Output from model
+        output = model(*model.train_inputs)
+        # Calc loss and backprop gradients
+        loss = -mll(output, model.train_targets)
+        loss.backward()
+        optimizer.step()
+    model.eval()
+    likelihood.eval()
+    if device == 'cpu':
+        model.cpu()
+        likelihood.cpu()
+    # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
+    return model
+
+
 
 def build_surrogates_loo_cv(parameter_data, property_data, property_uncertainties, label):
     X = torch.tensor(parameter_data).cuda()

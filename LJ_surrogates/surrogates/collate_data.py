@@ -5,7 +5,7 @@ import os
 import json
 import numpy as np
 import torch
-from LJ_surrogates.surrogates.surrogate import GPSurrogateModel, build_surrogate_lightweight, build_surrogates_loo_cv
+from LJ_surrogates.surrogates.surrogate import build_surrogate_lightweight, build_surrogates_loo_cv, build_multisurrogate_lightweight
 import matplotlib.pyplot as plt
 import tqdm
 import copy
@@ -149,7 +149,7 @@ class ParameterSetDataMultiplex:
         self.property_measurements = pandas.DataFrame(property_measurements, columns=property_labels)
         self.property_uncertainties = pandas.DataFrame(property_uncertainties, columns=property_labels)
 
-    def build_surrogates(self,do_cross_validation=True):
+    def build_surrogates(self,do_cross_validation=False):
         surrogates = []
 
         if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
@@ -174,6 +174,18 @@ class ParameterSetDataMultiplex:
             surrogates.append(model)
 
         self.surrogates = surrogates
+
+    def build_multisurrogates(self,do_cross_validation=True):
+        surrogates = []
+
+        if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
+            raise ValueError('Number of Parameter Sets and Measurement Sets must agree!')
+        else:
+            num_surrogates = self.property_measurements.shape[1]
+        surrogate_measurements = self.property_measurements.values.transpose()
+        surrogate_uncertainties = self.property_uncertainties.values.transpose()
+
+        self.surrogate = build_multisurrogate_lightweight(self.parameter_values.values, surrogate_measurements,surrogate_uncertainties, self.device)
 
     def evaluate_parameter_set(self, parameter_set):
 
@@ -229,6 +241,7 @@ def get_training_data_new(data, properties, parameters, device):
     dataplex.align_property_data()
     dataplex.plot_properties()
     print(f'Proceeding to build surrogates with {len(dataplex.multi_data)} Datasets')
+    # dataplex.build_multisurrogates()
     dataplex.build_surrogates()
     return dataplex
 
@@ -255,6 +268,8 @@ def canonicalize_dataset(dataset):
         raise TypeError('Dataset must be a PhysicalPropertyDataSet object')
     ids = []
     for property in dataset.properties:
+        if property.id.startswith('0'):
+            property.id = property.id[1:]
         ids.append(int(property.id, 16))
     ids = sorted(ids)
     for i, id in enumerate(ids):
