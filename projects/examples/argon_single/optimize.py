@@ -8,7 +8,8 @@ import gc
 import numpy as np
 import os
 from LJ_surrogates.sampling.optimize import UnconstrainedGaussianObjectiveFunction, ConstrainedGaussianObjectiveFunction
-from scipy.optimize import differential_evolution
+from scipy.optimize import differential_evolution, minimize, brute
+
 gc.collect()
 torch.cuda.empty_cache()
 path = '../../../data/argon-single-50-small'
@@ -19,24 +20,33 @@ device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
-dataplex.initial_parameters['[#18:1]'][0]._value = 0.25
-dataplex.initial_parameters['[#18:1]'][1]._value = 2.5
+# dataplex.initial_parameters['[#18:1]'][0]._value = 0.35
+# dataplex.initial_parameters['[#18:1]'][1]._value = 1.5
 
-objective = ConstrainedGaussianObjectiveFunction(dataplex.surrogates,dataplex.properties,dataplex.initial_parameters, 0.1)
+objective = ConstrainedGaussianObjectiveFunction(dataplex.surrogates, dataplex.multisurrogate, dataplex.properties,
+                                                 dataplex.initial_parameters, 0.1)
 objective.flatten_parameters()
 bounds = []
 for column in dataplex.parameter_values.columns:
     minbound = min(dataplex.parameter_values[column].values)
     maxbound = max(dataplex.parameter_values[column].values)
-    bounds.append((minbound,maxbound))
+    bounds.append((minbound, maxbound))
 objs = []
 params = []
-for i in range(50):
+objs_gd = []
+params_gd = []
+for i in range(10):
     result = differential_evolution(objective, bounds)
     objs.append(result.fun)
     params.append(result.x)
+result_brute = brute(objective, bounds, Ns=100, full_output=True, finish=None)
+result_gd = minimize(objective, np.array([0.2, 1.5]), bounds=bounds, method='L-BFGS-B')
+result_gd_ub = minimize(objective, np.array([0.2,1.5]), method='BFGS')
+objs_gd.append(result_gd.fun)
+params_gd.append(result_gd.x)
 params = np.asarray(params)
-
+params_gd = np.asarray(params_gd).T
+params_gd_ub = result_gd_ub.x
 grid = create_evaluation_grid(forcefield, smirks_types_to_change, np.array([0.25, 1.75]))
 likelihood = likelihood_function(dataplex, device)
 
@@ -50,11 +60,13 @@ def grid_to_surrogate_2D(grid, surrogate):
             # val = surrogate(
             #     torch.tensor(np.expand_dims(np.asarray([grid[0][i, j], grid[1][i, j]]), axis=1).transpose()).cuda())
             val = surrogate(
-                torch.tensor(np.expand_dims(np.asarray([grid[0][i, j], grid[1][i, j]]), axis=1).transpose()).to(device=device))
+                torch.tensor(np.expand_dims(np.asarray([grid[0][i, j], grid[1][i, j]]), axis=1).transpose()).to(
+                    device=device))
             value_grid[i, j] = val.mean
             uncertainty_grid[i, j] = val.stddev
 
     return value_grid, uncertainty_grid
+
 
 for i, surrogate in enumerate(likelihood.surrogates):
     value_grid, uncertainty_grid = grid_to_surrogate_2D(grid, surrogate)
@@ -64,15 +76,18 @@ for i, surrogate in enumerate(likelihood.surrogates):
     expt_temperature = dataplex.properties.properties[i].thermodynamic_state.temperature.m
     plt.contourf(grid[0], grid[1], abs(expt_value - value_grid), 20, cmap='RdGy')
     plt.colorbar()
-    plt.scatter(params[:,0],params[:,1],marker='x',color='1')
+    plt.scatter(params[:, 0], params[:, 1], marker='x', color='0', label='Differential Evolution')
+    plt.scatter(params_gd[0], params_gd[1], marker='v', color='0', label='L-BFGS-B')
+    plt.scatter(result_brute[0][0], result_brute[0][1], marker='s', color='0', label='Brute Force')
+    plt.scatter(params_gd_ub[0], params_gd_ub[1], marker='P', color='0', label='BFGS')
     plt.xlabel('[#18:1] epsilon (kcal/mol)')
     plt.ylabel('[#18:1] rmin_half (angstroms)')
     plt.title(
         f'Argon density deviation from experiment (g/ml) \n (Experimental value = {expt_value} g/ml @ {expt_temperature} K, {expt_pressure} atm)')
     plt.savefig(os.path.join('result/figures', f'surrogate_values_{expt_temperature}_K_{expt_pressure}_atm.png'),
                 dpi=300)
+    plt.legend()
     plt.show()
-
 
     plt.contourf(grid[0], grid[1], uncertainty_grid, 20, cmap='RdGy')
     plt.colorbar()

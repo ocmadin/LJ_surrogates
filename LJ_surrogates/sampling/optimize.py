@@ -6,9 +6,10 @@ import numpy as np
 
 
 class ObjectiveFunction(torch.nn.Module):
-    def __init__(self, surrogates, targets, initial_params):
+    def __init__(self, surrogates, multisurrogate, targets, initial_params):
         super(ObjectiveFunction, self).__init__()
         self.surrogates = surrogates
+        self.multisurrogate = multisurrogate
         self.targets = targets
         self.params = initial_params
         self.device = 'cpu'
@@ -57,10 +58,14 @@ class ObjectiveFunction(torch.nn.Module):
             eval = surrogate(parameter_set)
         return eval.mean, eval.variance
 
+    def evaluate_parameter_set_multisurrogate(self, parameter_set):
+        self.parameter_set = parameter_set
+        mean, variance = self.evaluate_surrogate_explicit_params(self.multisurrogate, parameter_set)
+        return mean, variance
 
 class UnconstrainedGaussianObjectiveFunction(ObjectiveFunction):
     def forward(self, parameters):
-        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set(
+        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
             torch.tensor(parameters).unsqueeze(-1).T)
         comb_uncert = torch.sqrt(torch.square(self.uncertainty_values) + torch.square(surrogate_uncertainties))
 
@@ -71,12 +76,12 @@ class UnconstrainedGaussianObjectiveFunction(ObjectiveFunction):
 
 
 class ConstrainedGaussianObjectiveFunction(ObjectiveFunction):
-    def __init__(self, surrogates, targets, initial_params, prior_width):
-        super().__init__(surrogates, targets, initial_params)
+    def __init__(self, surrogates, multisurrogate, targets, initial_params, prior_width):
+        super().__init__(surrogates, multisurrogate, targets, initial_params)
         self.prior_width = prior_width
 
     def forward(self, parameters):
-        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set(
+        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
             torch.tensor(parameters).unsqueeze(-1).T)
         comb_uncert = torch.sqrt(torch.square(self.uncertainty_values) + torch.square(surrogate_uncertainties))
         prior = torch.sum(torch.distributions.Normal(loc=torch.tensor(self.flat_parameters).unsqueeze(-1).T,

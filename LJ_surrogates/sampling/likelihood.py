@@ -14,10 +14,13 @@ import time
 import arviz
 from multiprocessing import Pool
 
+
 class likelihood_function:
     def __init__(self, dataplex, device):
         self.device = torch.device(device)
         self.surrogates = dataplex.surrogates
+        self.botorch_surrogates = dataplex.botorch_surrogates
+        self.multisurrogate = dataplex.multisurrogate
         self.experimental_properties = dataplex.properties
         self.parameters = dataplex.initial_parameters
         self.flatten_parameters()
@@ -62,6 +65,30 @@ class likelihood_function:
 
         return predictions_all, uncertainties_all
 
+    def evaluate_parameter_set_botorch(self, parameter_set):
+        self.parameter_set = parameter_set
+        predictions_all = []
+        uncertainties_all = []
+        for surrogate in self.botorch_surrogates:
+            mean, variance = self.evaluate_surrogate_explicit_params(surrogate, parameter_set)
+            predictions_all.append(mean)
+            uncertainties_all.append(variance)
+        uncertainties_all = torch.cat(uncertainties_all)
+        predictions_all = torch.cat(predictions_all)
+        uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1).to(device=self.device)
+        predictions_all = predictions_all.reshape(predictions_all.shape[0], 1).to(device=self.device)
+        # predictions_all = predictions_all.reshape(predictions_all.shape[0], 1)
+        # uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1)
+
+        return predictions_all, uncertainties_all
+
+    def evaluate_parameter_set_multisurrogate(self, parameter_set):
+        self.parameter_set = parameter_set
+        mean, variance = self.evaluate_surrogate(self.multisurrogate)
+
+
+        return mean, variance
+
     def evaluate_parameter_set_map(self, parameter_set):
         self.parameter_set = parameter_set
         x_map = list(map(self.evaluate_surrogate, self.surrogates))
@@ -69,7 +96,7 @@ class likelihood_function:
         predictions = torch.tensor(x_map)
         return predictions[:, 0].unsqueeze(-1), predictions[:, 1].unsqueeze(-1)
 
-    def add_prior(self,prior):
+    def add_prior(self, prior):
         self.prior = prior
 
     def evaluate_surrogate(self, surrogate):
@@ -78,12 +105,19 @@ class likelihood_function:
             eval = surrogate(self.parameter_set)
         return eval.mean, eval.variance
 
+    def evaluate_multisurrogate(self, surrogate, params):
+        with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
+                True) and gpytorch.settings.fast_pred_var(True):
+            eval = surrogate(params)
+        return eval.mean, eval.variance
+
     def evaluate_surrogate_explicit_params(self, surrogate, parameter_set):
         self.parameter_set = parameter_set
         with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                 True) and gpytorch.settings.fast_pred_var(True):
             eval = surrogate(self.parameter_set)
         return eval.mean, eval.variance
+
 
     def evaluate_surrogate_gpflow(self, surrogate, parameter_set):
         before = time.time()
@@ -126,13 +160,13 @@ class likelihood_function:
         #     )
         # )
 
-        predictions, predicted_uncertainties = self.evaluate_parameter_set(parameters)
+        predictions, predicted_uncertainties = self.evaluate_parameter_set_multisurrogate(parameters)
+        # multi_predictions, multi_predicted_uncertainties = self.evaluate_parameter_set_multisurrogate(parameters)
         # print(predicted_uncertainties)
         uncertainty = pyro.deterministic(
             "uncertainty", torch.sqrt(torch.square(self.uncertainty_values) + torch.square(predicted_uncertainties)))
         # uncertainty = pyro.deterministic(
         #     "uncertainty", self.uncertainty_values)
-
 
         if self.device == 'cuda':
             return pyro.sample(
@@ -149,7 +183,7 @@ class likelihood_function:
 
     def sample(self, samples, step_size=0.001, max_tree_depth=10, num_chains=1):
         # Train the parameters and plot the sampled traces.
-        nuts_kernel = NUTS(self.pyro_model, step_size=step_size, max_tree_depth=max_tree_depth,max_plate_nesting=5)
+        nuts_kernel = NUTS(self.pyro_model, step_size=step_size, max_tree_depth=max_tree_depth, max_plate_nesting=5)
         initial_params = {'parameters': torch.tile(self.flat_parameters, (num_chains, 1))}
         if samples <= 10000:
             warmup_steps = int(np.floor(samples / 5))
@@ -161,9 +195,9 @@ class likelihood_function:
 
         self.mcmc.run()
         self.samples = self.mcmc.get_samples()
-
+        # diagnostics = self.mcmc.diagnostics()
+        # print(diagnostics)
         return self.mcmc, self.flat_parameters
-
 
 
 class TruncatedNormal(pyro.distributions.Rejector):

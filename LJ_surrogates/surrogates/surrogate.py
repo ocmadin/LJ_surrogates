@@ -193,6 +193,56 @@ def build_surrogate_lightweight(parameter_data, property_data, property_uncertai
     # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
     return model
 
+def build_surrogate_lightweight_botorch(parameter_data, property_data, property_uncertainties, device):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data.flatten()).unsqueeze(-1).to(device=cuda)
+    Y_err = torch.tensor(property_uncertainties.flatten()).unsqueeze(-1).to(device=cuda)
+
+    mean_module = gpytorch.means.ConstantMean()
+    covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+
+    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+    # likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
+    from botorch.models import FixedNoiseGP
+    model = FixedNoiseGP(X, Y, Y_err, covar_module=covar_module).cuda()
+
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+    from botorch.fit import fit_gpytorch_model
+    fit_gpytorch_model(mll)
+    model.eval()
+    likelihood.eval()
+    if device == 'cpu':
+        model.cpu()
+        likelihood.cpu()
+    # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
+    return model
+
+def build_multisurrogate_lightweight_botorch(parameter_data, property_data, property_uncertainties, device):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data).T.to(device=cuda)
+    Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
+
+    mean_module = gpytorch.means.ConstantMean()
+    covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+
+    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+    # likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
+    from botorch.models import FixedNoiseGP
+    from botorch.models.transforms.outcome import Standardize
+    from botorch.fit import fit_gpytorch_model
+    model = FixedNoiseGP(X, Y, Y_err, covar_module=covar_module).cuda()
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+    fit_gpytorch_model(mll)
+    model.eval()
+    model.likelihood.eval()
+    if device == 'cpu':
+        model.cpu()
+        likelihood.cpu()
+    # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
+    return model
+
 def build_multisurrogate_lightweight(parameter_data, property_data, property_uncertainties, device):
     cuda = torch.device('cuda')
     X = torch.tensor(parameter_data).to(device=cuda)
@@ -259,96 +309,70 @@ def build_multisurrogate_lightweight(parameter_data, property_data, property_unc
 
 
 
-def build_surrogates_loo_cv(parameter_data, property_data, property_uncertainties, label):
-    X = torch.tensor(parameter_data).cuda()
-    Y = torch.tensor(property_data.flatten()).cuda()
-    Y_err = torch.tensor(property_uncertainties.flatten()).cuda()
+def build_surrogates_loo_cv(parameter_data, property_data, property_uncertainties, labels):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data).T.to(device=cuda)
+    Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
     # X = torch.tensor(parameter_data)
     # Y = torch.tensor(property_data.flatten())
     # Y_err = torch.tensor(property_uncertainties.flatten())
     from botorch.cross_validation import gen_loo_cv_folds
     cv_folds = gen_loo_cv_folds(X, Y, Y_err)
     train_X = cv_folds.train_X
-    train_Y = cv_folds.train_Y.squeeze(2)
-    train_Y_err = cv_folds.train_Yvar.squeeze(2)
+    train_Y = cv_folds.train_Y
+    train_Y_err = cv_folds.train_Yvar
     test_X = cv_folds.test_X
     test_Y = cv_folds.test_Y.squeeze(1).cpu().numpy()
     test_Y_err = cv_folds.test_Yvar.squeeze(1).cpu().numpy()
 
-    # test_Y = cv_folds.test_Y.squeeze(1).numpy()
-    # test_Y_err = cv_folds.test_Yvar.squeeze(1).numpy()
+    from botorch.models import FixedNoiseGP
+    covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+    means = []
+    uncertainties = []
+    for i in range(train_X.shape[0]):
+        model = FixedNoiseGP(train_X[i], train_Y[i], train_Y_err[i],covar_module=covar_module).cuda()
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+        from botorch.fit import fit_gpytorch_model
+        fit_gpytorch_model(mll)
 
-    class ExactGPModel(gpytorch.models.ExactGP):
-        def __init__(self, train_x, train_y, likelihood):
-            super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
-            self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([train_x.shape[0]]))
-            # self.covar_module = gpytorch.kernels.ScaleKernel(
-            #     gpytorch.kernels.RBFKernel(batch_shape=torch.Size([train_x.shape[0]]), ard_num_dims=train_x.shape[1]),
-            #     batch_shape=torch.Size([train_x.shape[0]]))
-            self.covar_module = gpytorch.kernels.ScaleKernel(
-                gpytorch.kernels.RBFKernel(batch_shape=torch.Size([train_x.shape[0]])),
-                batch_shape=torch.Size([train_x.shape[0]]), ard_num_dims=train_x.shape[2])
-            # initialize likelihood and model
+        model.eval()
+        model.likelihood.eval()
 
-        def forward(self, x):
-            mean_x = self.mean_module(x)
-            covar_x = self.covar_module(x)
-            return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-
-    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(train_Y_err),
-                                                                   batch_shape=torch.Size([train_Y_err.shape[0]]))
-    model = ExactGPModel(train_X, train_Y, likelihood).cuda()
-    # model = ExactGPModel(train_X, train_Y, likelihood)
-    # self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    # self.model = ExactGPModel(self.X, self.Y, self.likelihood)
-    model.train()
-    likelihood.train()
-    training_iter = 1000
-    # Use the adam optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
-
-    # "Loss" for GPs - the marginal log likelihood
-    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-    for i in range(training_iter):
-        # Zero gradients from previous iteration
-        optimizer.zero_grad()
-        # Output from model
-        output = model(train_X)
-        # Calc loss and backprop gradients
-        loss = -mll(output, train_Y).sum()
-        loss.backward()
-        optimizer.step()
-    model.eval()
-    likelihood.eval()
-
-    output = model(test_X)
-    mean = output.mean.detach().cpu().numpy()
-    stdev = output.stddev.detach().cpu().numpy()
-    # mean = output.mean.detach().numpy()
-    # stdev = output.stddev.detach().numpy()
+        output = model(test_X[i])
+        mean = output.mean.detach().cpu().numpy()
+        stdev = output.stddev.detach().cpu().numpy()
+        means.append(mean)
+        uncertainties.append(stdev)
+    means = np.asarray(means)
+    uncertainties = np.asarray(uncertainties)
+    if property_data.shape[0] > 1:
+        means = means.squeeze()
+        uncertainties = uncertainties.squeeze()
     os.makedirs('validation', exist_ok=True)
-    df = pandas.DataFrame(
-        np.vstack((test_Y.squeeze(), property_uncertainties.squeeze(), mean.squeeze(), stdev.squeeze())).T,
-        columns=['Simulated Value', 'Simulated Uncertainty', 'Surrogate Value', 'Surrogate Uncertainty'])
-    df.to_csv(os.path.join('validation', 'cross_validation_' + str(label) + '.csv'))
-    xax = [min(mean) * 0.9, max(mean) * 1.1]
-    yax = [min(mean) * 0.9, max(mean) * 1.1]
-    RMSE = np.sqrt(np.mean(np.square(mean - test_Y)))
-    avg_surrogate_uncertainty = np.mean(stdev)
-    print(f'LOO Cross-Validation for {label} surrogate:')
-    print(f'Surrogate RMSE from Simulation: {RMSE}')
-    print(f'Max Surrogate Error from Simulation: {max(mean - test_Y)}')
-    print(f'Average Surrogate Uncertainty: {avg_surrogate_uncertainty}')
-    print(f'Max Surrogate Uncertainty:{max(stdev)}')
-    plt.errorbar(mean, test_Y, xerr=1.96 * stdev.squeeze(), yerr=property_uncertainties.squeeze(), ls='none',
-                 marker='.')
-    plt.plot(xax, yax, color='k', lw=0.5)
-    plt.title(f'LOO Cross-validation for surrogate \n {label}')
-    plt.xlabel('Surrogate Output')
-    plt.ylabel('Simulation Value')
-    plt.savefig(os.path.join('validation', 'cross-validation_' + str(label) + '.png'))
-    plt.close()
+    for i in range(len(labels)):
+        df = pandas.DataFrame(
+            np.vstack((test_Y[:,i], test_Y_err[:,i], means[:,i], uncertainties[:,i])).T,
+            columns=['Simulated Value', 'Simulated Uncertainty', 'Surrogate Value', 'Surrogate Uncertainty'])
+        df.to_csv(os.path.join('validation', 'cross_validation_' + str(labels[i]) + '.csv'))
+
+        xax = [min(means[:,i]) * 0.9, max(means[:,i]) * 1.1]
+        yax = [min(means[:,i]) * 0.9, max(means[:,i]) * 1.1]
+        RMSE = np.sqrt(np.mean(np.square(means[:,i] - test_Y[:,i])))
+        avg_surrogate_uncertainty = np.mean(uncertainties[:,i])
+        print(f'LOO Cross-Validation for {labels[i]} surrogate:')
+        print(f'Surrogate RMSE from Simulation: {RMSE}')
+        print(f'Max Surrogate Error from Simulation: {max(means[:,i] - test_Y[:,i])}')
+        print(f'Average Surrogate Uncertainty: {avg_surrogate_uncertainty}')
+        print(f'Max Surrogate Uncertainty:{max(uncertainties[:,i])}')
+        plt.errorbar(means[:,i], test_Y[:,i], xerr=1.96 * uncertainties[:,i], yerr=test_Y_err[:,i], ls='none',
+                     marker='.')
+        plt.plot(xax, yax, color='k', lw=0.5)
+        plt.title(f'LOO Cross-validation for surrogate \n {labels[i]}')
+        plt.xlabel('Surrogate Output')
+        plt.ylabel('Simulation Value')
+        plt.savefig(os.path.join('validation', 'cross-validation_' + str(labels[i]) + '.png'))
+        plt.close()
 
 
 def compute_surrogate_gradients(surrogate, point, eps, device):
