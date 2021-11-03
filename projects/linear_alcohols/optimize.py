@@ -1,4 +1,4 @@
-from LJ_surrogates.sampling.optimize import UnconstrainedGaussianObjectiveFunction, ConstrainedGaussianObjectiveFunction
+from LJ_surrogates.sampling.optimize import ConstrainedGaussianObjectiveFunction, create_forcefields_from_optimized_params
 from LJ_surrogates.surrogates.collate_data import collate_physical_property_data
 import torch
 import gc
@@ -69,3 +69,5 @@ for i in range(pairplot.axes.shape[0]):
                 pairplot.axes[i][j].scatter(param_set[j], param_set[i], marker='+', color='k')
 plt.tight_layout()
 pairplot.savefig('trace_with_opt.png', dpi=300)
+
+create_forcefields_from_optimized_params(params,objective.flat_parameter_names,'openff-1-3-0.offxml')

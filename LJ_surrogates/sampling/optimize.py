@@ -1,8 +1,13 @@
+import os
+
+import pandas
 import torch
 import torch.distributions
 import gpytorch
 import copy
 import numpy as np
+from openff.toolkit.typing.engines.smirnoff.forcefield import ForceField
+from simtk import openmm, unit
 
 
 class ObjectiveFunction(torch.nn.Module):
@@ -30,9 +35,6 @@ class ObjectiveFunction(torch.nn.Module):
             self.flat_parameter_names.append(key + '_epsilon')
             self.flat_parameter_names.append(key + '_rmin_half')
         self.flat_parameters = np.asarray(self.flat_parameters)
-        # self.flat_parameters = torch.tensor(self.flat_parameters.reshape(self.flat_parameters.shape[0],1).transpose())
-        # self.flat_parameters = torch.tensor(np.expand_dims(self.flat_parameters, axis=1).transpose()).to(
-        #     device=self.device)
 
     def initialize_parameters(self):
         self.flatten_parameters()
@@ -122,3 +124,24 @@ class TorchAdagradOptimizer(Optimizer):
     def __init__(self, objective_function):
         self.objective_function = objective_function
         self.optimizer = torch.optim.Adagrad(objective_function.parameters(), lr=0.01)
+
+
+def create_forcefields_from_optimized_params(params, labels, input_forcefield):
+    params = np.asarray(params)
+    df = pandas.DataFrame(params,columns=labels)
+    df.head()
+    os.makedirs('optimized_ffs', exist_ok=True)
+    for i in range(df.shape[0]):
+        os.makedirs(os.path.join('optimized_ffs',str(i)),exist_ok=True)
+        forcefield = ForceField(input_forcefield)
+        lj_params = forcefield.get_parameter_handler('vdW', allow_cosmetic_attributes=True)
+        for j in range(df.shape[1]):
+            smirks = df.columns[j].split('_')[0]
+            param = df.columns[j].split('_')[1]
+            for lj in lj_params:
+                if lj.smirks == smirks:
+                    if param == 'epsilon':
+                        lj.epsilon = df.values[i,j] * unit.kilocalorie_per_mole
+                    elif param == 'rmin':
+                        lj.rmin_half = df.values[i,j] * unit.angstrom
+        forcefield.to_file(os.path.join('optimized_ffs',str(i),'force-field.offxml'))

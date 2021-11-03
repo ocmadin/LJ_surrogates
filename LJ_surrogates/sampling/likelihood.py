@@ -5,14 +5,8 @@ import pyro.distributions
 import torch
 import torch.distributions
 from pyro.infer import MCMC, NUTS, HMC
-# from numpyro.infer import MCMC, NUTS, HMC
-import numpyro.distributions as npdist
-# from jax.random import PRNGKey
 import gpytorch
-import functools
 import time
-import arviz
-from multiprocessing import Pool
 
 
 class likelihood_function:
@@ -30,9 +24,7 @@ class likelihood_function:
             experiment_vector.append(property.value.m)
             uncertainty_vector.append(property.uncertainty.m)
         self.experimental_values = torch.tensor(experiment_vector).unsqueeze(-1).to(device=self.device)
-        # self.experimental_values = torch.tensor(experiment_vector).unsqueeze(-1)
         self.uncertainty_values = torch.tensor(uncertainty_vector).unsqueeze(-1).to(device=self.device)
-        # self.uncertainty_values = torch.tensor(uncertainty_vector).unsqueeze(-1)
 
     def flatten_parameters(self):
         self.flat_parameters = []
@@ -43,10 +35,9 @@ class likelihood_function:
             self.flat_parameter_names.append(key + '_epsilon')
             self.flat_parameter_names.append(key + '_rmin_half')
         self.flat_parameters = np.asarray(self.flat_parameters)
-        # self.flat_parameters = torch.tensor(self.flat_parameters.reshape(self.flat_parameters.shape[0],1).transpose())
         self.flat_parameters = torch.tensor(np.expand_dims(self.flat_parameters, axis=1).transpose()).to(
             device=self.device)
-        # self.flat_parameters = torch.tensor(np.expand_dims(self.flat_parameters, axis=1).transpose())
+
 
     def evaluate_parameter_set(self, parameter_set):
         self.parameter_set = parameter_set
@@ -60,8 +51,6 @@ class likelihood_function:
         predictions_all = torch.cat(predictions_all)
         uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1).to(device=self.device)
         predictions_all = predictions_all.reshape(predictions_all.shape[0], 1).to(device=self.device)
-        # predictions_all = predictions_all.reshape(predictions_all.shape[0], 1)
-        # uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1)
 
         return predictions_all, uncertainties_all
 
@@ -77,9 +66,6 @@ class likelihood_function:
         predictions_all = torch.cat(predictions_all)
         uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1).to(device=self.device)
         predictions_all = predictions_all.reshape(predictions_all.shape[0], 1).to(device=self.device)
-        # predictions_all = predictions_all.reshape(predictions_all.shape[0], 1)
-        # uncertainties_all = uncertainties_all.reshape(uncertainties_all.shape[0], 1)
-
         return predictions_all, uncertainties_all
 
     def evaluate_parameter_set_multisurrogate(self, parameter_set):
@@ -92,7 +78,6 @@ class likelihood_function:
     def evaluate_parameter_set_map(self, parameter_set):
         self.parameter_set = parameter_set
         x_map = list(map(self.evaluate_surrogate, self.surrogates))
-        # predictions = torch.tensor(x_map).cuda()
         predictions = torch.tensor(x_map)
         return predictions[:, 0].unsqueeze(-1), predictions[:, 1].unsqueeze(-1)
 
@@ -161,12 +146,8 @@ class likelihood_function:
         # )
 
         predictions, predicted_uncertainties = self.evaluate_parameter_set_multisurrogate(parameters)
-        # multi_predictions, multi_predicted_uncertainties = self.evaluate_parameter_set_multisurrogate(parameters)
-        # print(predicted_uncertainties)
         uncertainty = pyro.deterministic(
             "uncertainty", torch.sqrt(torch.square(self.uncertainty_values) + torch.square(predicted_uncertainties)))
-        # uncertainty = pyro.deterministic(
-        #     "uncertainty", self.uncertainty_values)
 
         if self.device == 'cuda':
             return pyro.sample(

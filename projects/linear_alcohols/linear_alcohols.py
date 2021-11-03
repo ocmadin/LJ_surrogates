@@ -49,7 +49,7 @@ start = time.time()
 predict_botorch_multi, stddev_botorch_multi = likelihood.evaluate_parameter_set_multisurrogate(test_params_one)
 end = time.time()
 print(f'Botorch Multi: {end - start} seconds')
-mcmc, initial_parameters = likelihood.sample(samples=1000000, step_size=0.0001, max_tree_depth=5, num_chains=1)
+mcmc, initial_parameters = likelihood.sample(samples=1000, step_size=0.0001, max_tree_depth=5, num_chains=1)
 # params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
 # params = np.append(params,initial_parameters.cpu().numpy(),axis=0)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
@@ -68,9 +68,19 @@ for i, column in enumerate(df.columns):
     columns[column] = wrapper.fill(column)
 df.rename(columns=columns, inplace=True)
 
-pairplot = seaborn.pairplot(df, kind='kde', corner=True)
+pairplot = seaborn.pairplot(df, kind='hist', corner=True)
 pairplot.map_upper(seaborn.kdeplot, levels=4, color=".2")
 plt.tight_layout()
-pairplot.savefig(os.path.join('result/figures', 'trace.png'), dpi=300)
+pairplot.savefig(os.path.join('result/figures', 'trace_hist.png'), dpi=300)
 
-plot_triangle(params, likelihood, ranges, None)
+if df.shape[0] < 10000:
+    n = df.shape[0]
+else:
+    n = 10000
+
+pairplot = seaborn.pairplot(df.sample(n=n), kind='kde', corner=True)
+pairplot.map_upper(seaborn.kdeplot, levels=4, color=".2")
+plt.tight_layout()
+pairplot.savefig(os.path.join('result/figures', 'trace_subsample.png'), dpi=300)
+
+plot_triangle(params, likelihood, ranges, n, None)

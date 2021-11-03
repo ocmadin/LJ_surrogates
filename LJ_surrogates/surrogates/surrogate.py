@@ -349,7 +349,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
     if property_data.shape[0] > 1:
         means = means.squeeze()
         uncertainties = uncertainties.squeeze()
-    os.makedirs('validation', exist_ok=True)
+    os.makedirs(os.path.join('result','validation'), exist_ok=True)
     for i in range(len(labels)):
         df = pandas.DataFrame(
             np.vstack((test_Y[:,i], test_Y_err[:,i], means[:,i], uncertainties[:,i])).T,
@@ -371,7 +371,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
         plt.title(f'LOO Cross-validation for surrogate \n {labels[i]}')
         plt.xlabel('Surrogate Output')
         plt.ylabel('Simulation Value')
-        plt.savefig(os.path.join('validation', 'cross-validation_' + str(labels[i]) + '.png'))
+        plt.savefig(os.path.join('result','validation', 'cross-validation_' + str(labels[i]) + '.png'))
         plt.close()
 
 

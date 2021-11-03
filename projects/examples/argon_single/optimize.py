@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import gc
 import numpy as np
 import os
-from LJ_surrogates.sampling.optimize import UnconstrainedGaussianObjectiveFunction, ConstrainedGaussianObjectiveFunction
+from LJ_surrogates.sampling.optimize import ConstrainedGaussianObjectiveFunction, create_forcefields_from_optimized_params
 from scipy.optimize import differential_evolution, minimize, brute
 
 gc.collect()
@@ -102,3 +102,5 @@ for i, surrogate in enumerate(likelihood.surrogates):
     plt.savefig(os.path.join('result/figures', f'surrogate_uncertainties_{expt_temperature}_K_{expt_pressure}_atm.png'),
                 dpi=300)
     plt.show()
+
+out_data = create_forcefields_from_optimized_params(params,objective.flat_parameter_names,'openff-1-3-0-argon.offxml')
