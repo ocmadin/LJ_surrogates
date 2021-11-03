@@ -12,10 +12,10 @@ import copy
 
 
 class GPSurrogateModel:
-    def __init__(self, parameter_data, property_data):
-        self.cuda = torch.device('cuda')
-        self.X = torch.tensor(parameter_data).to(device=self.cuda)
-        self.Y = torch.tensor(property_data.flatten()).to(device=self.cuda)
+    def __init__(self, parameter_data, property_data, device):
+        self.device = torch.device('device')
+        self.X = torch.tensor(parameter_data).to(device=self.device)
+        self.Y = torch.tensor(property_data.flatten()).to(device=self.device)
         self.X_gpflow = parameter_data
         self.Y_gpflow = property_data
         # self.X = torch.tensor(parameter_data)
@@ -80,6 +80,8 @@ class GPSurrogateModel:
 
         self.likelihood = gpytorch.likelihoods.GaussianLikelihood().cuda()
         self.model = GPRegressionModel(self.X, self.Y, self.likelihood).cuda()
+        # self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        # self.model = GPRegressionModel(self.X, self.Y, self.likelihood)
         training_iter = 1000
         # Use the adam optimizer
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
@@ -98,6 +100,9 @@ class GPSurrogateModel:
             optimizer.step()
         self.model.eval()
         self.likelihood.eval()
+        if self.device == 'cpu':
+            self.model.cpu()
+            self.likelihood.cpu()
         delattr(self, 'X')
         delattr(self, 'Y')
 
@@ -131,12 +136,15 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
-def build_surrogate_lightweight(parameter_data, property_data, property_uncertainties):
+def build_surrogate_lightweight(parameter_data, property_data, property_uncertainties, device):
     cuda = torch.device('cuda')
     X = torch.tensor(parameter_data).to(device=cuda)
     Y = torch.tensor(property_data.flatten()).to(device=cuda)
     Y_err = torch.tensor(property_uncertainties.flatten()).to(device=cuda)
 
+    # X = torch.tensor(parameter_data)
+    # Y = torch.tensor(property_data.flatten())
+    # Y_err = torch.tensor(property_uncertainties.flatten())
 
     class ExactGPModel(gpytorch.models.ExactGP):
         def __init__(self, train_x, train_y, likelihood):
@@ -151,7 +159,11 @@ def build_surrogate_lightweight(parameter_data, property_data, property_uncertai
             return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
     likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+    # likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
+
     model = ExactGPModel(X, Y, likelihood).cuda()
+    # model = ExactGPModel(X, Y, likelihood)
+
     # self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
     # self.model = ExactGPModel(self.X, self.Y, self.likelihood)
     model.train()
@@ -175,41 +187,98 @@ def build_surrogate_lightweight(parameter_data, property_data, property_uncertai
     model.eval()
     likelihood.eval()
     print(model.covar_module.base_kernel.lengthscale.detach().cpu().numpy())
+    if device == 'cpu':
+        model.cpu()
+        likelihood.cpu()
+    # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
     return model
 
+def build_surrogate_lightweight_botorch(parameter_data, property_data, property_uncertainties, device):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data.flatten()).unsqueeze(-1).to(device=cuda)
+    Y_err = torch.tensor(property_uncertainties.flatten()).unsqueeze(-1).to(device=cuda)
 
-def build_surrogates_loo_cv(parameter_data, property_data, property_uncertainties, label):
-    X = torch.tensor(parameter_data).cuda()
-    Y = torch.tensor(property_data.flatten()).cuda()
-    Y_err = torch.tensor(property_uncertainties.flatten()).cuda()
-    from botorch.cross_validation import gen_loo_cv_folds
-    cv_folds = gen_loo_cv_folds(X, Y, Y_err)
-    train_X = cv_folds.train_X
-    train_Y = cv_folds.train_Y.squeeze(2)
-    train_Y_err = cv_folds.train_Yvar.squeeze(2)
-    test_X = cv_folds.test_X
-    test_Y = cv_folds.test_Y.squeeze(1).cpu().numpy()
-    test_Y_err = cv_folds.test_Yvar.squeeze(1).cpu().numpy()
+    mean_module = gpytorch.means.ConstantMean()
+    covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
 
+    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+    # likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
+    from botorch.models import FixedNoiseGP
+    model = FixedNoiseGP(X, Y, Y_err, covar_module=covar_module).cuda()
+
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+    from botorch.fit import fit_gpytorch_model
+    fit_gpytorch_model(mll)
+    model.eval()
+    likelihood.eval()
+    if device == 'cpu':
+        model.cpu()
+        likelihood.cpu()
+    # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
+    return model
+
+def build_multisurrogate_lightweight_botorch(parameter_data, property_data, property_uncertainties, device):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data).T.to(device=cuda)
+    Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
+
+    mean_module = gpytorch.means.ConstantMean()
+    covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+
+    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+    # likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
+    from botorch.models import FixedNoiseGP
+    from botorch.models.transforms.outcome import Standardize
+    from botorch.fit import fit_gpytorch_model
+    model = FixedNoiseGP(X, Y, Y_err, covar_module=covar_module).cuda()
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+    fit_gpytorch_model(mll)
+    model.eval()
+    model.likelihood.eval()
+    if device == 'cpu':
+        model.cpu()
+        likelihood.cpu()
+    # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
+    return model
+
+def build_multisurrogate_lightweight(parameter_data, property_data, property_uncertainties, device):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+
+    # X = torch.tensor(parameter_data)
+    # Y = torch.tensor(property_data.flatten())
+    # Y_err = torch.tensor(property_uncertainties.flatten())
     class ExactGPModel(gpytorch.models.ExactGP):
         def __init__(self, train_x, train_y, likelihood):
             super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
-            self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([train_x.shape[0]]))
-            # self.covar_module = gpytorch.kernels.ScaleKernel(
-            #     gpytorch.kernels.RBFKernel(batch_shape=torch.Size([train_x.shape[0]]), ard_num_dims=train_x.shape[1]),
-            #     batch_shape=torch.Size([train_x.shape[0]]))
-            self.covar_module = gpytorch.kernels.ScaleKernel(
-                gpytorch.kernels.RBFKernel(batch_shape=torch.Size([train_x.shape[0]])),
-                batch_shape=torch.Size([train_x.shape[0]]))
-                # initialize likelihood and model
+            self.mean_module = gpytorch.means.ConstantMean()
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=train_x.shape[1]))
+            # self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(lengthscale_constraint=gpytorch.constraints.GreaterThan(0.25)))
 
         def forward(self, x):
             mean_x = self.mean_module(x)
             covar_x = self.covar_module(x)
             return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
-    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(train_Y_err),batch_shape=torch.Size([train_Y_err.shape[0]]))
-    model = ExactGPModel(train_X, train_Y, likelihood).cuda()
+    num_surrogates = property_data.shape[0]
+    models = []
+    likelihoods = []
+    for i in range(num_surrogates):
+        individual_property_measurements = property_data[i].reshape(
+            (property_data[0].shape[0], 1))
+        Y = torch.tensor(individual_property_measurements.flatten()).to(device=cuda)
+        individual_property_uncertainties = property_uncertainties[i].reshape(
+            (property_uncertainties[0].shape[0], 1))
+        Y_err = torch.tensor(individual_property_uncertainties.flatten()).to(device=cuda)
+        likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+        likelihoods.append(likelihood)
+        models.append(ExactGPModel(X, Y, likelihood).cuda())
+
+    model = gpytorch.models.IndependentModelList(*models)
+    likelihood = gpytorch.likelihoods.LikelihoodList(*likelihoods)
+
     # self.likelihood = gpytorch.likelihoods.GaussianLikelihood()
     # self.model = ExactGPModel(self.X, self.Y, self.likelihood)
     model.train()
@@ -219,54 +288,103 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
 
     # "Loss" for GPs - the marginal log likelihood
-    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    mll = gpytorch.mlls.SumMarginalLogLikelihood(likelihood, model)
 
     for i in range(training_iter):
         # Zero gradients from previous iteration
         optimizer.zero_grad()
         # Output from model
-        output = model(train_X)
+        output = model(*model.train_inputs)
         # Calc loss and backprop gradients
-        loss = -mll(output, train_Y).sum()
+        loss = -mll(output, model.train_targets)
         loss.backward()
         optimizer.step()
     model.eval()
     likelihood.eval()
+    if device == 'cpu':
+        model.cpu()
+        likelihood.cpu()
+    # print(model.covar_module.base_kernel.lengthscale.detach().numpy())
+    return model
 
-    output = model(test_X)
-    mean = output.mean.detach().cpu().numpy()
-    stdev = output.stddev.detach().cpu().numpy()
-    os.makedirs('validation', exist_ok=True)
-    df = pandas.DataFrame(np.vstack((test_Y.squeeze(), property_uncertainties.squeeze(), mean.squeeze(), stdev.squeeze())).T,
-                     columns=['Simulated Value', 'Simulated Uncertainty', 'Surrogate Value', 'Surrogate Uncertainty'])
-    df.to_csv(os.path.join('validation', 'cross_validation_' + str(label) + '.csv'))
-    xax = [min(mean) * 0.9, max(mean) * 1.1]
-    yax = [min(mean) * 0.9, max(mean) * 1.1]
-    RMSE = np.sqrt(np.mean(np.square(mean-test_Y)))
-    avg_surrogate_uncertainty = np.mean(stdev)
-    print(f'LOO Cross-Validation for {label} surrogate:')
-    print(f'Surrogate RMSE from Simulation: {RMSE}')
-    print(f'Max Surrogate Error from Simulation: {max(mean-test_Y)}')
-    print(f'Average Surrogate Uncertainty: {avg_surrogate_uncertainty}')
-    print(f'Max Surrogate Uncertainty:{max(stdev)}')
-    plt.errorbar(mean, test_Y, xerr=1.96 * stdev.squeeze(), yerr=property_uncertainties.squeeze(), ls='none',
-                 marker='.')
-    plt.plot(xax, yax, color='k', lw=0.5)
-    plt.title(f'LOO Cross-validation for surrogate \n {label}')
-    plt.xlabel('Surrogate Output')
-    plt.ylabel('Simulation Value')
-    plt.savefig(os.path.join('validation', 'cross-validation_' + str(label) + '.png'))
-    plt.close()
 
-def compute_surrogate_gradients(surrogate, point, eps):
+
+def build_surrogates_loo_cv(parameter_data, property_data, property_uncertainties, labels):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data).T.to(device=cuda)
+    Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
+    # X = torch.tensor(parameter_data)
+    # Y = torch.tensor(property_data.flatten())
+    # Y_err = torch.tensor(property_uncertainties.flatten())
+    from botorch.cross_validation import gen_loo_cv_folds
+    cv_folds = gen_loo_cv_folds(X, Y, Y_err)
+    train_X = cv_folds.train_X
+    train_Y = cv_folds.train_Y
+    train_Y_err = cv_folds.train_Yvar
+    test_X = cv_folds.test_X
+    test_Y = cv_folds.test_Y.squeeze(1).cpu().numpy()
+    test_Y_err = cv_folds.test_Yvar.squeeze(1).cpu().numpy()
+
+    from botorch.models import FixedNoiseGP
+    covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+    means = []
+    uncertainties = []
+    for i in range(train_X.shape[0]):
+        model = FixedNoiseGP(train_X[i], train_Y[i], train_Y_err[i],covar_module=covar_module).cuda()
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+        from botorch.fit import fit_gpytorch_model
+        fit_gpytorch_model(mll)
+
+        model.eval()
+        model.likelihood.eval()
+
+        output = model(test_X[i])
+        mean = output.mean.detach().cpu().numpy()
+        stdev = output.stddev.detach().cpu().numpy()
+        means.append(mean)
+        uncertainties.append(stdev)
+    means = np.asarray(means)
+    uncertainties = np.asarray(uncertainties)
+    if property_data.shape[0] > 1:
+        means = means.squeeze()
+        uncertainties = uncertainties.squeeze()
+    os.makedirs(os.path.join('result','validation'), exist_ok=True)
+    for i in range(len(labels)):
+        df = pandas.DataFrame(
+            np.vstack((test_Y[:,i], test_Y_err[:,i], means[:,i], uncertainties[:,i])).T,
+            columns=['Simulated Value', 'Simulated Uncertainty', 'Surrogate Value', 'Surrogate Uncertainty'])
+        df.to_csv(os.path.join('validation', 'cross_validation_' + str(labels[i]) + '.csv'))
+
+        xax = [min(means[:,i]) * 0.9, max(means[:,i]) * 1.1]
+        yax = [min(means[:,i]) * 0.9, max(means[:,i]) * 1.1]
+        RMSE = np.sqrt(np.mean(np.square(means[:,i] - test_Y[:,i])))
+        avg_surrogate_uncertainty = np.mean(uncertainties[:,i])
+        print(f'LOO Cross-Validation for {labels[i]} surrogate:')
+        print(f'Surrogate RMSE from Simulation: {RMSE}')
+        print(f'Max Surrogate Error from Simulation: {max(means[:,i] - test_Y[:,i])}')
+        print(f'Average Surrogate Uncertainty: {avg_surrogate_uncertainty}')
+        print(f'Max Surrogate Uncertainty:{max(uncertainties[:,i])}')
+        plt.errorbar(means[:,i], test_Y[:,i], xerr=1.96 * uncertainties[:,i], yerr=test_Y_err[:,i], ls='none',
+                     marker='.')
+        plt.plot(xax, yax, color='k', lw=0.5)
+        plt.title(f'LOO Cross-validation for surrogate \n {labels[i]}')
+        plt.xlabel('Surrogate Output')
+        plt.ylabel('Simulation Value')
+        plt.savefig(os.path.join('result','validation', 'cross-validation_' + str(labels[i]) + '.png'))
+        plt.close()
+
+
+def compute_surrogate_gradients(surrogate, point, eps, device):
     gradients = []
     for i, param in enumerate(point):
         perturbed_point_1 = copy.deepcopy(point)
-        perturbed_point_1[i] =  point[i] + eps * point[i]
+        perturbed_point_1[i] = point[i] + eps * point[i]
         perturbed_point_2 = copy.deepcopy(point)
         perturbed_point_2[i] = point[i] - eps * point[i]
-        gradient = (surrogate(torch.tensor(numpy.expand_dims(perturbed_point_1,axis=1).T).cuda()).mean - surrogate(torch.tensor(numpy.expand_dims(perturbed_point_2,axis=1).T).cuda()).mean)/(2*eps*point[i])
+        gradient = (surrogate(
+            torch.tensor(numpy.expand_dims(perturbed_point_1, axis=1).T).to(device=device)).mean - surrogate(
+            torch.tensor(numpy.expand_dims(perturbed_point_2, axis=1).T).to(device=device)).mean) / (2 * eps * point[i])
+
         gradients.append(gradient)
     return gradients
-
-

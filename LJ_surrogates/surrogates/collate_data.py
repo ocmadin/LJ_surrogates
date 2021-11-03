@@ -5,13 +5,14 @@ import os
 import json
 import numpy as np
 import torch
-from LJ_surrogates.surrogates.surrogate import GPSurrogateModel, build_surrogate_lightweight, build_surrogates_loo_cv
+from LJ_surrogates.surrogates.surrogate import build_surrogate_lightweight, build_surrogates_loo_cv, \
+    build_multisurrogate_lightweight, build_surrogate_lightweight_botorch, build_multisurrogate_lightweight_botorch
 import matplotlib.pyplot as plt
 import tqdm
 import copy
 
 
-def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath):
+def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath, device):
     data = []
     counter = 0
     for i in range(int(len(os.listdir(directory)) / 2)):
@@ -23,11 +24,11 @@ def collate_physical_property_data(directory, smirks, initial_forcefield, proper
             parameters = get_force_field_parameters(forcefield, smirks)
             if len(results) != 0:
                 data.append([results, parameters])
-    print(f'Started with {i+1} datasets, removed {i+1-len(data)} empty dataset(s)')
+    print(f'Started with {i + 1} datasets, removed {i + 1 - len(data)} empty dataset(s)')
     initial_forcefield = ForceField(initial_forcefield)
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
     properties = PhysicalPropertyDataSet.from_json(properties_filepath)
-    dataplex = get_training_data_new(data, properties, initial_parameters)
+    dataplex = get_training_data_new(data, properties, initial_parameters, device)
     # properties_all = get_training_data(data)
     return dataplex
 
@@ -57,11 +58,12 @@ class ParameterSetData:
 
 
 class ParameterSetDataMultiplex:
-    def __init__(self, ParameterDataSetList, InitialProperties, InitialParameters):
+    def __init__(self, ParameterDataSetList, InitialProperties, InitialParameters, device):
         self.multi_data = ParameterDataSetList
         self.parameters = self.multi_data[0].parameters
         self.properties = InitialProperties
         self.initial_parameters = InitialParameters
+        self.device = device
 
     def align_data(self):
         pass
@@ -100,16 +102,17 @@ class ParameterSetDataMultiplex:
     def prune_bad_densities(self):
         print('Eliminating Bad Density Measurements...')
         before = len(self.multi_data)
-        for i,property in enumerate(self.properties.properties):
+        for i, property in enumerate(self.properties.properties):
             if self.property_labels[i].endswith('Density'):
                 to_pop = []
-                for j,measurement in enumerate(self.multi_data):
+                for j, measurement in enumerate(self.multi_data):
                     if measurement.property_measurements.properties[i].value.m <= 0.1 * property.value.m:
                         to_pop.append(j)
-                for pop in sorted(to_pop,reverse=True):
+                for pop in sorted(to_pop, reverse=True):
                     del self.multi_data[pop]
         after = len(self.multi_data)
-        print(f"Removed {before-after} datasets due to bad density measurments")
+        print(f"Removed {before - after} datasets due to bad density measurments")
+
     def align_property_data(self):
         parameter_labels = []
         for parameter in self.parameters:
@@ -143,13 +146,13 @@ class ParameterSetDataMultiplex:
         property_measurements = np.asarray(property_measurements)
         property_uncertainties = np.asarray(property_uncertainties)
 
-
         self.parameter_values = pandas.DataFrame(all_parameters, columns=parameter_labels)
         self.property_measurements = pandas.DataFrame(property_measurements, columns=property_labels)
         self.property_uncertainties = pandas.DataFrame(property_uncertainties, columns=property_labels)
 
-    def build_surrogates(self,do_cross_validation=True):
+    def build_surrogates(self, do_cross_validation=False):
         surrogates = []
+        botorch_surrogates = []
 
         if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
             raise ValueError('Number of Parameter Sets and Measurement Sets must agree!')
@@ -157,7 +160,7 @@ class ParameterSetDataMultiplex:
             num_surrogates = self.property_measurements.shape[1]
         surrogate_measurements = self.property_measurements.values.transpose()
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
-        for i in tqdm.tqdm(range(num_surrogates),ascii=True,desc='Building and Validating Surrogates'):
+        for i in tqdm.tqdm(range(num_surrogates), ascii=True, desc='Building and Validating Surrogates'):
             individual_property_measurements = surrogate_measurements[i].reshape(
                 (surrogate_measurements[0].shape[0], 1))
             individual_property_uncertainties = surrogate_uncertainties[i].reshape(
@@ -166,13 +169,35 @@ class ParameterSetDataMultiplex:
             #                          property_data=individual_property_measurements)
             # model.build_surrogate_gpflow()
             # model.model.train_targets = model.model.train_targets.detach()
-            model = build_surrogate_lightweight(self.parameter_values.values,individual_property_measurements, individual_property_uncertainties)
+            model = build_surrogate_lightweight(self.parameter_values.values, individual_property_measurements,
+                                                individual_property_uncertainties, self.device)
+            botorch_model = build_surrogate_lightweight_botorch(self.parameter_values.values,
+                                                                individual_property_measurements,
+                                                                individual_property_uncertainties, self.device)
             if do_cross_validation is True:
-                build_surrogates_loo_cv(self.parameter_values.values,individual_property_measurements,individual_property_uncertainties,self.property_labels[i])
+                build_surrogates_loo_cv(self.parameter_values.values, individual_property_measurements,
+                                        individual_property_uncertainties, self.property_labels[i])
             model.train_targets = model.train_targets.detach()
             surrogates.append(model)
-
+            botorch_surrogates.append(botorch_model)
         self.surrogates = surrogates
+        self.botorch_surrogates = botorch_surrogates
+
+    def build_multisurrogates(self, do_cross_validation=True):
+        surrogates = []
+
+        if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
+            raise ValueError('Number of Parameter Sets and Measurement Sets must agree!')
+        else:
+            num_surrogates = self.property_measurements.shape[1]
+        surrogate_measurements = self.property_measurements.values.transpose()
+        surrogate_uncertainties = self.property_uncertainties.values.transpose()
+
+        self.multisurrogate = build_multisurrogate_lightweight_botorch(self.parameter_values.values, surrogate_measurements,
+                                                          surrogate_uncertainties, self.device)
+        if do_cross_validation is True:
+            build_surrogates_loo_cv(self.parameter_values.values, surrogate_measurements,
+                                    surrogate_uncertainties, self.property_labels)
 
     def evaluate_parameter_set(self, parameter_set):
 
@@ -193,41 +218,42 @@ class ParameterSetDataMultiplex:
         params = self.parameter_values.to_numpy()
         ranges = []
         for i in range(params.shape[1]):
-            ranges.append([min(params[:,i]),max(params[:,i])])
+            ranges.append([min(params[:, i]), max(params[:, i])])
 
         ranges = np.asarray(ranges)
         return ranges
 
     def plot_properties(self):
-        os.makedirs(os.path.join('result','properties','figures'), exist_ok=True)
-        x_range = np.linspace(0,self.property_measurements.shape[0]-1,num=self.property_measurements.shape[0])
+        os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
+        x_range = np.linspace(0, self.property_measurements.shape[0] - 1, num=self.property_measurements.shape[0])
         for i, column in enumerate(self.property_measurements.columns):
-            plt.errorbar(x_range, self.property_measurements[column].values, yerr=self.property_uncertainties[column].values, ls='none', capsize=0, marker='x')
+            plt.errorbar(x_range, self.property_measurements[column].values,
+                         yerr=self.property_uncertainties[column].values, ls='none', capsize=0, marker='x')
             plt.axhline(self.properties.properties[i].value.m)
             plt.title(
                 f'{str(self.properties.properties[i].substance)}: {self.properties.properties[i].value} +/- {self.properties.properties[i].uncertainty}')
             plt.xlabel('Parameter Set')
             plt.ylabel('Property Value')
             label = f'{str(self.properties.properties[i].substance)}_{self.properties.properties[i].value}'
-            plt.savefig(os.path.join('result','properties','figures','property_'+str(i)+'.png'), dpi=300)
+            plt.savefig(os.path.join('result', 'properties', 'figures', 'property_' + str(i) + '.png'), dpi=300)
             plt.clf()
 
 
-def get_training_data_new(data, properties, parameters):
-
+def get_training_data_new(data, properties, parameters, device):
     data_list = []
     for datum in data:
         data_list.append(ParameterSetData(datum))
     print('Collecting and Preparing Data...')
-    dataplex = ParameterSetDataMultiplex(data_list, properties, parameters)
+    dataplex = ParameterSetDataMultiplex(data_list, properties, parameters, device)
     before = copy.deepcopy(len(dataplex.multi_data))
     dataplex.check_parameters()
     dataplex.check_properties()
     after = len(dataplex.multi_data)
-    print(f'Removed {before-after} incomplete or errored datasets')
+    print(f'Removed {before - after} incomplete or errored datasets')
     dataplex.align_property_data()
     dataplex.plot_properties()
     print(f'Proceeding to build surrogates with {len(dataplex.multi_data)} Datasets')
+    dataplex.build_multisurrogates()
     dataplex.build_surrogates()
     return dataplex
 
@@ -254,6 +280,8 @@ def canonicalize_dataset(dataset):
         raise TypeError('Dataset must be a PhysicalPropertyDataSet object')
     ids = []
     for property in dataset.properties:
+        if property.id.startswith('0'):
+            property.id = property.id[1:]
         ids.append(int(property.id, 16))
     ids = sorted(ids)
     for i, id in enumerate(ids):

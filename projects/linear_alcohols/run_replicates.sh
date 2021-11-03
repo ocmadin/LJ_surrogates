@@ -1,6 +1,6 @@
 #!/bin/bash
 
-conda activate LJ_surrogates
+conda activate lj-surrogates-mcmc
 
 number_of_replicates=200
 
@@ -8,4 +8,3 @@ python prepare_simulations.py -n $number_of_replicates -o 'modified_force_fields
 
 cd run_server
 bsub < server-submit.sh
-
