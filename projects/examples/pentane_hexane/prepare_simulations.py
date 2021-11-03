@@ -9,7 +9,7 @@ import argparse
 
 def main(n_samples, output_directory, forcefield, data_filepath):
     smirks = ['[#6X4:1]', '[#1:1]-[#6X4]']
-    param_range = [0.75,1.25]
+    param_range = [0.50,1.50]
     if data_filepath.endswith('.csv'):
         data_csv = pandas.read_csv(data_filepath)
         data_csv['Id'] = data_csv['Id'].astype('string')
