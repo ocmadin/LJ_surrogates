@@ -13,7 +13,7 @@ def plot_sampling_boundaries_1D(x_values, ranges, **kwargs):
     plt.axvline(max(x_values), ls='--', color='k', lw=1)
 
 
-def plot_triangle(params, likelihood, ranges, opt_params, boundaries=True, maxima=False):
+def plot_triangle(params, likelihood, ranges, opt_params, n, boundaries=True, maxima=False):
     df = pandas.DataFrame(params[:-1], columns=likelihood.flat_parameter_names)
     df2 = pandas.DataFrame(np.expand_dims(params[-1],axis=0), columns=likelihood.flat_parameter_names)
     wrapper = textwrap.TextWrapper(width=25)
@@ -21,7 +21,7 @@ def plot_triangle(params, likelihood, ranges, opt_params, boundaries=True, maxim
     for i, column in enumerate(df.columns):
         columns[column] = wrapper.fill(column)
     df.rename(columns=columns, inplace=True)
-    pairplot = seaborn.pairplot(df, kind='kde', corner=True)
+    pairplot = seaborn.pairplot(df.sample(n=n), kind='kde', corner=True)
     for i in range(pairplot.axes.shape[0]):
         for j in range(pairplot.axes.shape[0]):
             if i == j and boundaries is True:
