@@ -350,11 +350,12 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
         means = means.squeeze()
         uncertainties = uncertainties.squeeze()
     os.makedirs(os.path.join('result','validation'), exist_ok=True)
+    summary_df = []
     for i in range(len(labels)):
         df = pandas.DataFrame(
             np.vstack((test_Y[:,i], test_Y_err[:,i], means[:,i], uncertainties[:,i])).T,
             columns=['Simulated Value', 'Simulated Uncertainty', 'Surrogate Value', 'Surrogate Uncertainty'])
-        df.to_csv(os.path.join('validation', 'cross_validation_' + str(labels[i]) + '.csv'))
+        df.to_csv(os.path.join('result','validation', 'cross_validation_' + str(labels[i]) + '.csv'))
 
         xax = [min(means[:,i]) * 0.9, max(means[:,i]) * 1.1]
         yax = [min(means[:,i]) * 0.9, max(means[:,i]) * 1.1]
@@ -362,9 +363,13 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
         avg_surrogate_uncertainty = np.mean(uncertainties[:,i])
         print(f'LOO Cross-Validation for {labels[i]} surrogate:')
         print(f'Surrogate RMSE from Simulation: {RMSE}')
-        print(f'Max Surrogate Error from Simulation: {max(means[:,i] - test_Y[:,i])}')
+        print(f'Max Surrogate Error from Simulation: {max(abs(means[:,i] - test_Y[:,i]))}')
         print(f'Average Surrogate Uncertainty: {avg_surrogate_uncertainty}')
         print(f'Max Surrogate Uncertainty:{max(uncertainties[:,i])}')
+        difference = abs(means[:,i] - test_Y[:,i])
+        comb_uncert = uncertainties[:,i]*1.96 + test_Y_err[:,i]
+        in_uncert = difference/comb_uncert < 1
+        summary_df.append([RMSE,max(abs(means[:,i] - test_Y[:,i])),avg_surrogate_uncertainty,max(uncertainties[:,i]),in_uncert.sum()*100/len(in_uncert)])
         plt.errorbar(means[:,i], test_Y[:,i], xerr=1.96 * uncertainties[:,i], yerr=test_Y_err[:,i], ls='none',
                      marker='.')
         plt.plot(xax, yax, color='k', lw=0.5)
@@ -373,7 +378,9 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
         plt.ylabel('Simulation Value')
         plt.savefig(os.path.join('result','validation', 'cross-validation_' + str(labels[i]) + '.png'))
         plt.close()
-
+    summary_df = np.asarray(summary_df)
+    summary_df = pandas.DataFrame(summary_df,columns=['Surrogate RMSE from Simulation','Max Surrogate Error','Average Surrogate Uncertainty','Max Surrogate Uncertainty', '% within combined uncertainty'],index=labels)
+    summary_df.to_csv(os.path.join('result','validation', 'cross_validation_summary.csv'))
 
 def compute_surrogate_gradients(surrogate, point, eps, device):
     gradients = []
