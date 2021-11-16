@@ -1,5 +1,6 @@
 import pandas
 from openff.evaluator.datasets import PhysicalPropertyDataSet
+from openff.evaluator.properties import enthalpy, density
 from openff.toolkit.typing.engines.smirnoff import ForceField
 import os
 import json
@@ -29,6 +30,7 @@ def collate_physical_property_data(directory, smirks, initial_forcefield, proper
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
     properties = PhysicalPropertyDataSet.from_json(properties_filepath)
     dataplex = get_training_data_new(data, properties, initial_parameters, device)
+    dataplex.plot_properties()
     # properties_all = get_training_data(data)
     return dataplex
 
@@ -193,8 +195,9 @@ class ParameterSetDataMultiplex:
         surrogate_measurements = self.property_measurements.values.transpose()
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
 
-        self.multisurrogate = build_multisurrogate_lightweight_botorch(self.parameter_values.values, surrogate_measurements,
-                                                          surrogate_uncertainties, self.device)
+        self.multisurrogate = build_multisurrogate_lightweight_botorch(self.parameter_values.values,
+                                                                       surrogate_measurements,
+                                                                       surrogate_uncertainties, self.device)
         if do_cross_validation is True:
             build_surrogates_loo_cv(self.parameter_values.values, surrogate_measurements,
                                     surrogate_uncertainties, self.property_labels)
@@ -226,10 +229,18 @@ class ParameterSetDataMultiplex:
     def plot_properties(self):
         os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
         x_range = np.linspace(0, self.property_measurements.shape[0] - 1, num=self.property_measurements.shape[0])
+
+
+
         for i, column in enumerate(self.property_measurements.columns):
             plt.errorbar(x_range, self.property_measurements[column].values,
-                         yerr=self.property_uncertainties[column].values, ls='none', capsize=0, marker='x')
-            plt.axhline(self.properties.properties[i].value.m)
+                         yerr=self.property_uncertainties[column].values, ls='none', capsize=0, marker='x', color='k',
+                         label="Simulated Measurements")
+            plt.axhline(self.properties.properties[i].value.m, label='Experimental value')
+            plt.axhspan(self.properties.properties[i].value.m - self.properties.properties[i].uncertainty.m,
+                        self.properties.properties[i].value.m + self.properties.properties[i].uncertainty.m, 0, 1,
+                        color='b', alpha=0.1, label='Experimental Uncertainty')
+            plt.legend()
             plt.title(
                 f'{str(self.properties.properties[i].substance)}: {self.properties.properties[i].value} +/- {self.properties.properties[i].uncertainty}')
             plt.xlabel('Parameter Set')
@@ -237,6 +248,38 @@ class ParameterSetDataMultiplex:
             label = f'{str(self.properties.properties[i].substance)}_{self.properties.properties[i].value}'
             plt.savefig(os.path.join('result', 'properties', 'figures', 'property_' + str(i) + '.png'), dpi=300)
             plt.clf()
+
+    def calculate_ff_rmses(self):
+        hvap_reference = []
+        density_reference = []
+        hvap_rmse = []
+        density_rmse = []
+        for property in self.properties.properties:
+            if type(property) == enthalpy.EnthalpyOfVaporization:
+                hvap_reference.append(property.value.m)
+            elif type(property) == density.Density:
+                density_reference.append(property.value.m)
+        hvap_reference = np.asarray(hvap_reference)
+        density_reference = np.asarray(density_reference)
+        for i in range(self.property_measurements.values.shape[0]):
+            hvap_estimate = []
+            density_estimate = []
+            for j in range(len(self.property_measurements.values[0,:])):
+                if self.property_measurements.columns[j].endswith('EnthalpyOfVaporization'):
+                    hvap_estimate.append(self.property_measurements.values[i,j])
+                elif self.property_measurements.columns[j].endswith('Density'):
+                    density_estimate.append(self.property_measurements.values[i,j])
+            hvap_estimate = np.asarray(hvap_estimate)
+            density_estimate = np.asarray(density_estimate)
+            hvap_rmse.append(np.mean(np.sqrt(np.square(hvap_reference-hvap_estimate))))
+            density_rmse.append(np.mean(np.sqrt(np.square(density_reference-density_estimate))))
+        return hvap_rmse, density_rmse
+
+
+
+
+
+
 
 
 def get_training_data_new(data, properties, parameters, device):

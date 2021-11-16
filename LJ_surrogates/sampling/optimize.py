@@ -145,3 +145,6 @@ def create_forcefields_from_optimized_params(params, labels, input_forcefield):
                     elif param == 'rmin':
                         lj.rmin_half = df.values[i,j] * unit.angstrom
         forcefield.to_file(os.path.join('optimized_ffs',str(i),'force-field.offxml'))
+    forcefield = ForceField(input_forcefield)
+    os.makedirs(os.path.join('optimized_ffs', str(df.shape[0])), exist_ok=True)
+    forcefield.to_file(os.path.join('optimized_ffs', str(df.shape[0]), 'force-field.offxml'))
