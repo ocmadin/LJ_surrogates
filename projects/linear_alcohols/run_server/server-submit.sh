@@ -14,7 +14,7 @@
 . ~/.bashrc
 
 # Use the right conda environment
-conda activate lj_surrogates_mcmc
+conda activate LJ_surrogates
 conda env export > conda_env.yaml
 
 # Run the commands
