@@ -11,6 +11,7 @@ from LJ_surrogates.surrogates.surrogate import build_surrogate_lightweight, buil
 import matplotlib.pyplot as plt
 import tqdm
 import copy
+import gpytorch
 
 
 def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath, device):
@@ -274,6 +275,25 @@ class ParameterSetDataMultiplex:
             hvap_rmse.append(np.mean(np.sqrt(np.square(hvap_reference-hvap_estimate))))
             density_rmse.append(np.mean(np.sqrt(np.square(density_reference-density_estimate))))
         return hvap_rmse, density_rmse
+
+    def calculate_surrogate_simulation_deviation(self):
+        params = self.parameter_values.values
+        prediction_values = []
+        prediction_uncertainties = []
+        for i in range(params.shape[0]):
+            with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
+                    True) and gpytorch.settings.fast_pred_var(True):
+                eval = self.multisurrogate(torch.tensor(params[i,:]).unsqueeze(-1).T)
+            prediction_values.append(eval.mean.detach().numpy())
+            prediction_uncertainties.append(eval.variance.detach().numpy())
+        prediction_values = np.asarray(prediction_values).squeeze(2)
+        prediction_uncertainties = np.asarray(prediction_uncertainties).squeeze(2)
+        deviation = abs(prediction_values - self.property_measurements.values)
+        percent_deviation = 100 * deviation / self.property_measurements.values
+        comb_uncert = prediction_uncertainties * 1.96 + self.property_uncertainties.values
+        in_uncert = deviation / comb_uncert < 1
+        return deviation, percent_deviation, comb_uncert, in_uncert
+
 
 
 
