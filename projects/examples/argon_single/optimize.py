@@ -9,6 +9,9 @@ import numpy as np
 import os
 from LJ_surrogates.sampling.optimize import ConstrainedGaussianObjectiveFunction, create_forcefields_from_optimized_params
 from scipy.optimize import differential_evolution, minimize, brute
+import pandas
+import textwrap
+import seaborn
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -35,7 +38,7 @@ objs = []
 params = []
 objs_gd = []
 params_gd = []
-for i in range(10):
+for i in range(1):
     result = differential_evolution(objective, bounds)
     objs.append(result.fun)
     params.append(result.x)
@@ -67,7 +70,7 @@ def grid_to_surrogate_2D(grid, surrogate):
 
     return value_grid, uncertainty_grid
 
-
+os.makedirs(os.path.join('result','figures'),exist_ok=True)
 for i, surrogate in enumerate(likelihood.surrogates):
     value_grid, uncertainty_grid = grid_to_surrogate_2D(grid, surrogate)
     expt_value = dataplex.properties.properties[i]._value.m
@@ -104,3 +107,27 @@ for i, surrogate in enumerate(likelihood.surrogates):
     plt.show()
 
 out_data = create_forcefields_from_optimized_params(params,objective.flat_parameter_names,'openff-1-3-0-argon.offxml')
+
+samples = np.load('result_5k_11_17/params.npy')
+
+df = pandas.DataFrame(samples[:-1], columns=objective.flat_parameter_names)
+df2 = pandas.DataFrame(np.expand_dims(samples[-1],axis=0), columns=objective.flat_parameter_names)
+wrapper = textwrap.TextWrapper(width=25)
+columns = {}
+for i, column in enumerate(df.columns):
+    columns[column] = wrapper.fill(column)
+df.rename(columns=columns, inplace=True)
+pairplot = seaborn.pairplot(df, kind='kde', corner=True)
+for i in range(pairplot.axes.shape[0]):
+    for j in range(pairplot.axes.shape[0]):
+        if i == j:
+            for param_set in params:
+                # pass
+                pairplot.axes[i][j].axvline(param_set[i], color='k', ls='--')
+        elif i > j:
+            for param_set in params:
+                # pass
+                pairplot.axes[i][j].scatter(param_set[j], param_set[i], marker='x', color='k',zorder=5,label='Optimized Value')
+pairplot.axes[1][0].legend(fontsize=10, loc='lower right')
+plt.tight_layout()
+pairplot.savefig('trace_with_opt.png', dpi=300)
