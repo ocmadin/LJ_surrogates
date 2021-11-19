@@ -8,8 +8,9 @@ import argparse
 
 
 def main(n_samples, output_directory, forcefield, data_filepath):
-    param_range = [[0.5, 1.5], [0.95, 1.05], [0.8, 1.2], [0.8, 1.2], [0.8, 1.2], [0.8, 1.2], [0.8,1.2],[0.8,1.2],[0.8,1.2],[0.8,1.2]]
-    smirks = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]','[#8X2H1+0:1]']
+    param_range = [[0.5, 1.5], [0.95, 1.05], [0.8, 1.2], [0.8, 1.2], [0.8, 1.2], [0.8, 1.2], [0.8, 1.2], [0.8, 1.2],
+                   [0.8, 1.2], [0.8, 1.2], [0.8, 1.2], [0.8, 1.2]]
+    smirks = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
     if data_filepath.endswith('.csv'):
         data_csv = pandas.read_csv(data_filepath)
         data_csv['Id'] = data_csv['Id'].astype('string')
@@ -20,12 +21,14 @@ def main(n_samples, output_directory, forcefield, data_filepath):
         raise TypeError('File should either be a dataset in the format of a csv or json')
     data_set.json('test-set-collection.json')
 
-    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, np.asarray(param_range), nonuniform_ranges=True)
+    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, np.asarray(param_range),
+                        nonuniform_ranges=True)
 
     for folder in os.listdir(output_directory):
         shutil.copy2('test-set-collection.json', os.path.join(output_directory, folder))
         shutil.copy2('submit.sh', os.path.join(output_directory, folder))
-        shutil.copy2('basic_run.py',os.path.join(output_directory, folder))
+        shutil.copy2('basic_run.py', os.path.join(output_directory, folder))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
