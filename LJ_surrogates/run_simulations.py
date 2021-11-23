@@ -9,13 +9,14 @@ from openff.evaluator.client import EvaluatorClient
 from openff.evaluator.backends import QueueWorkerResources
 from openff.evaluator.backends.dask import DaskLSFBackend
 from openff.evaluator.server import EvaluatorServer
-from pint import unit
+from pint import UnitRegistry
 import os
 import numpy as np
 import shutil
 import time
 
 def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
+    ureg = UnitRegistry()
     if n_workers <= 0:
         raise ValueError("The number of workers must be greater than 0")
     if cpus_per_worker <= 0:
@@ -49,7 +50,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
             number_of_threads=cpus_per_worker,
             number_of_gpus=gpus_per_worker,
             preferred_gpu_toolkit=QueueWorkerResources.GPUToolkit.CUDA,
-            per_thread_memory_limit=5 * unit.gigabytes
+            per_thread_memory_limit=5 * ureg.gigabyte
         )
 
     # Define the set of commands which will set up the correct environment
