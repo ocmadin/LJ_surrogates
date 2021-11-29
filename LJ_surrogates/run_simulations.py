@@ -50,8 +50,9 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
             number_of_threads=cpus_per_worker,
             number_of_gpus=gpus_per_worker,
             preferred_gpu_toolkit=QueueWorkerResources.GPUToolkit.CUDA,
-            per_thread_memory_limit=5 * unit.gigabyte
+            wallclock_time_limit='04:00'
         )
+        worker_resources._per_thread_memory_limit *=5
 
     # Define the set of commands which will set up the correct environment
     # for each of the workers.
