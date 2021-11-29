@@ -15,6 +15,7 @@ import numpy as np
 import shutil
 import time
 
+
 def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
     if n_workers <= 0:
         raise ValueError("The number of workers must be greater than 0")
@@ -87,21 +88,49 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
             requests = []
             forcefields = []
 
-            for subdirectory in os.listdir(files_directory):
+            from time import sleep
+            from openff.evaluator.client import RequestResult
+            requests_by_directory = {}
 
+            for subdirectory in os.listdir(files_directory):
                 forcefield = SmirnoffForceFieldSource.from_path(
                     os.path.join(files_directory, subdirectory, 'force-field.offxml'))
                 property_dataset = PhysicalPropertyDataSet.from_json(
                     os.path.join(files_directory, subdirectory, 'test-set-collection.json'))
 
-                requests.append(estimate_forcefield_properties(property_dataset,forcefield))
-                forcefields.append(forcefield.to_force_field())
-            results = [
-                request.results(synchronous=True, polling_interval=30)[0]
-                for request in requests
-            ]
-    return results, forcefields
+                requests_by_directory[subdirectory] = estimate_forcefield_properties(property_dataset, forcefield)
+                forcefield.to_force_field().to_file(
+                    os.path.join('estimated_results', 'force_field_' + str(subdirectory) + '.offxml'))
 
+            while len(requests_by_directory) > 0:
+
+                has_finished = set()
+
+                for subdirectory, request in requests_by_directory.items():
+
+                    response, error = request.results(synchronous=False)
+
+                    if (
+                            isinstance(response, RequestResult) and
+                            len(response.queued_properties) > 0
+                    ):
+                        # Some properties not estimated yet.
+                        continue
+
+                    elif isinstance(response, RequestResult):
+                        # ALL PROPERTIES WERE SUCCESSFULLY ESTIMATED
+                        response.estimated_properties.json(
+                            os.path.join('estimated_results', 'estimated_data_set_' + str(subdirectory) + '.json'))
+
+                    else:
+                        print(f"{subdirectory} FAILED - {error} {response}")
+
+                    has_finished.add(subdirectory)
+
+                for subdirectory in has_finished:
+                    requests_by_directory.pop(subdirectory)
+
+                sleep(60)
 
 
 def estimate_forcefield_properties(property_dataset, forcefield):
