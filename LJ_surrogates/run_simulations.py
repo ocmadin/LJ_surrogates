@@ -16,7 +16,7 @@ import shutil
 import time
 
 
-def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
+def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory, port):
     if n_workers <= 0:
         raise ValueError("The number of workers must be greater than 0")
     if cpus_per_worker <= 0:
@@ -30,6 +30,8 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
             "The number of GPU's per worker must match the number of "
             "CPU's per worker."
         )
+    if port < 8000:
+        raise ValueError("The port number must be greater than or equal to 8000")
 
     # Set up logging for the evaluator.
     setup_timestamp_logging()
@@ -82,7 +84,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory):
 
         with EvaluatorServer(calculation_backend=lsf_backend,
                              working_directory=working_directory,
-                             port=8000,
+                             port=port,
                              enable_data_caching=False,
                              delete_working_files=True):
 

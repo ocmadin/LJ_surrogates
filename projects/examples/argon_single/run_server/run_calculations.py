@@ -4,9 +4,9 @@ from LJ_surrogates.run_simulations import run_server
 import os
 
 
-def main(n_workers, cpus_per_worker, gpus_per_worker,ff_directory):
+def main(n_workers, cpus_per_worker, gpus_per_worker,ff_directory, port):
     os.makedirs('estimated_results', exist_ok=True)
-    results, forcefields = run_server(n_workers, cpus_per_worker, gpus_per_worker, ff_directory)
+    run_server(n_workers, cpus_per_worker, gpus_per_worker, ff_directory, port)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -54,9 +54,21 @@ if __name__ == "__main__":
         required=False,
         default=1,
     )
+
+    parser.add_argument(
+        "--port",
+        "-p",
+        type=int,
+        help="The port number to accept server requests.  Must be above 8000"
+             "WARNING: if multiple servers are activated with the same port number,"
+             "It may cause requests to be sent to the wrong server.  If using multiple"
+             "servers, make sure the port numbers are different",
+        required=False,
+        default=1,
+    )
     args = parser.parse_args()
 
-    main(args.workers, args.cpus_per_worker, args.gpus_per_worker, args.ff_directory)
+    main(args.workers, args.cpus_per_worker, args.gpus_per_worker, args.ff_directory, args.port)
 
 # Create the backend which will adaptively try to spin up between one and
 # ten workers with the requested resources depending on the calculation load.
