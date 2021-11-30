@@ -5,7 +5,7 @@ from openff.evaluator.datasets import PhysicalPropertyDataSet
 from openff.evaluator.forcefield import SmirnoffForceFieldSource
 from openff.evaluator.properties import Density, EnthalpyOfMixing
 from openff.evaluator.client import RequestOptions
-from openff.evaluator.client import EvaluatorClient
+from openff.evaluator.client import EvaluatorClient, ConnectionOptions
 from openff.evaluator.backends import QueueWorkerResources
 from openff.evaluator.backends.dask import DaskLSFBackend
 from openff.evaluator.server import EvaluatorServer
@@ -136,7 +136,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory, por
                 sleep(60)
 
 
-def estimate_forcefield_properties(property_dataset, forcefield):
+def estimate_forcefield_properties(property_dataset, forcefield, port):
     warnings.filterwarnings('ignore')
     logging.getLogger("openforcefield").setLevel(logging.ERROR)
 
@@ -158,7 +158,8 @@ def estimate_forcefield_properties(property_dataset, forcefield):
     estimation_options.add_schema("SimulationLayer", "Density", density_schema)
     estimation_options.add_schema("SimulationLayer", "EnthalpyOfMixing", h_mix_schema)
 
-    evaluator_client = EvaluatorClient()
+    connection_options = ConnectionOptions(server_address="localhost", server_port=port)
+    evaluator_client = EvaluatorClient(connection_options)
 
     request, _ = evaluator_client.request_estimate(
         property_set=data_set,
