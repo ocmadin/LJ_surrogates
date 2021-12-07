@@ -101,7 +101,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory, por
                 property_dataset = PhysicalPropertyDataSet.from_json(
                     os.path.join(files_directory, subdirectory, 'test-set-collection.json'))
 
-                requests_by_directory[subdirectory] = estimate_forcefield_properties(property_dataset, forcefield)
+                requests_by_directory[subdirectory] = estimate_forcefield_properties(property_dataset, forcefield,port)
                 forcefield.to_force_field().to_file(
                     os.path.join('estimated_results', 'force_field_' + str(subdirectory) + '.offxml'))
 
