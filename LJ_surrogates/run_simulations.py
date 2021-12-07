@@ -122,7 +122,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory, por
 
                     elif isinstance(response, RequestResult):
                         # ALL PROPERTIES WERE SUCCESSFULLY ESTIMATED
-                        response.estimated_properties.json(
+                        response.json(
                             os.path.join('estimated_results', 'estimated_data_set_' + str(subdirectory) + '.json'))
 
                     else:
