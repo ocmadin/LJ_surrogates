@@ -38,7 +38,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory, por
     logger = logging.getLogger()
 
     # Set up the directory structure.
-    working_directory = "working_directory"
+    working_directory = "../working_directory"
 
     # Remove any existing data.
     if os.path.isdir(working_directory):
@@ -59,7 +59,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory, por
     # Define the set of commands which will set up the correct environment
     # for each of the workers.
     setup_script_commands = [
-        'module load cuda/10.1', 'conda activate LJ_surrogates'
+        'module load cuda/11.2', 'conda activate LJ_surrogates'
     ]
 
     # Define extra options to only run on certain node groups
