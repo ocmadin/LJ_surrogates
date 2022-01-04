@@ -73,3 +73,4 @@ def create_evaluation_grid(filename, smirks_types_to_change, param_range):
             ranges.append(lin_rmin)
     grid = np.meshgrid(*ranges)
     return grid
+

@@ -8,13 +8,11 @@ import numpy as np
 import pandas
 import textwrap
 import seaborn
-import os
-from LJ_surrogates.plotting.plotting import plot_triangle
 
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/alcohol_alkane/linear_alcohols_2nd_refinement_subsample_100'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/alcohol_alkane/linear_alcohols_2nd_refinement'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]', '[#1:1]-[#8]', '[#6X4:1]',
                           '[#8X2H1+0:1]']
 forcefield = 'openff-1-3-0.offxml'
@@ -24,7 +22,7 @@ device = 'cpu'
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
 
-objective = ConstrainedGaussianObjectiveFunction(dataplex.surrogates, dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
+objective = ConstrainedGaussianObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
                                                  0.1)
 objective.flatten_parameters()
 bounds = []
@@ -69,5 +67,6 @@ for i in range(pairplot.axes.shape[0]):
                 pairplot.axes[i][j].scatter(param_set[j], param_set[i], marker='+', color='k')
 plt.tight_layout()
 pairplot.savefig('trace_with_opt.png', dpi=300)
+
 
 create_forcefields_from_optimized_params(params,objective.flat_parameter_names,'openff-1-3-0.offxml')

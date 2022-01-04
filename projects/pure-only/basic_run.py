@@ -1,8 +1,6 @@
 from LJ_surrogates.run_simulations import estimate_forcefield_properties
 from openff.evaluator.datasets import PhysicalPropertyDataSet
 from openff.toolkit.typing.engines.smirnoff.forcefield import ForceField
-import pandas
-import os
 
 forcefield_file = 'force-field.offxml'
 
