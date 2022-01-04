@@ -3,11 +3,10 @@ from openff.evaluator.datasets import PhysicalPropertyDataSet
 from openff.evaluator.properties import enthalpy, density
 from openff.toolkit.typing.engines.smirnoff import ForceField
 import os
-import json
 import numpy as np
 import torch
 from LJ_surrogates.surrogates.surrogate import build_surrogate_lightweight, build_surrogates_loo_cv, \
-    build_multisurrogate_lightweight, build_surrogate_lightweight_botorch, build_multisurrogate_lightweight_botorch
+    build_surrogate_lightweight_botorch, build_multisurrogate_lightweight_botorch
 import matplotlib.pyplot as plt
 import tqdm
 import copy
@@ -16,16 +15,17 @@ import gpytorch
 
 def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath, device):
     data = []
-    counter = 0
     for i in range(int(len(os.listdir(directory)) / 2)):
-        if os.path.isfile(os.path.join(directory, 'force_field_' + str(i) + '.offxml')) and os.path.isfile(
-                os.path.join(directory, 'estimated_data_set_' + str(i) + '.json')):
-            forcefield = ForceField(os.path.join(directory, 'force_field_' + str(i) + '.offxml'))
+        if os.path.isfile(os.path.join(directory, 'force_field_' + str(i + 1) + '.offxml')) and os.path.isfile(
+                os.path.join(directory, 'estimated_data_set_' + str(i + 1) + '.json')):
+            forcefield = ForceField(os.path.join(directory, 'force_field_' + str(i + 1) + '.offxml'))
             results = PhysicalPropertyDataSet.from_json(
-                os.path.join(directory, 'estimated_data_set_' + str(i) + '.json'))
+                os.path.join(directory, 'estimated_data_set_' + str(i + 1) + '.json'))
             parameters = get_force_field_parameters(forcefield, smirks)
-            if len(results) != 0:
-                data.append([results, parameters])
+            if len(results.estimated_properties) != 0:
+                data.append([results.estimated_properties, parameters])
+            # if len(results) != 0:
+            #     data.append([results, parameters])
     print(f'Started with {i + 1} datasets, removed {i + 1 - len(data)} empty dataset(s)')
     initial_forcefield = ForceField(initial_forcefield)
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
@@ -84,6 +84,7 @@ class ParameterSetDataMultiplex:
 
     def check_properties(self):
         multi_data = []
+        failed_data = []
         self.properties = canonicalize_dataset(self.properties)
         for dataset in self.multi_data:
             dataset.property_measurements = canonicalize_dataset(dataset.property_measurements)
@@ -100,11 +101,15 @@ class ParameterSetDataMultiplex:
                         equality = False
             if equality == True:
                 multi_data.append(dataset)
+            else:
+                failed_data.append(dataset)
         self.multi_data = multi_data
+        self.failed_data = failed_data
 
     def prune_bad_densities(self):
         print('Eliminating Bad Density Measurements...')
         before = len(self.multi_data)
+        self.bad_density_data = []
         for i, property in enumerate(self.properties.properties):
             if self.property_labels[i].endswith('Density'):
                 to_pop = []
@@ -112,6 +117,7 @@ class ParameterSetDataMultiplex:
                     if measurement.property_measurements.properties[i].value.m <= 0.1 * property.value.m:
                         to_pop.append(j)
                 for pop in sorted(to_pop, reverse=True):
+                    self.bad_density_data.append(self.multi_data[pop])
                     del self.multi_data[pop]
         after = len(self.multi_data)
         print(f"Removed {before - after} datasets due to bad density measurments")
@@ -139,17 +145,37 @@ class ParameterSetDataMultiplex:
             property_measurements.append(measurements)
             property_uncertainties.append(uncertainties)
         all_parameters = []
+        failed_parameters = []
+        bad_density_parameters = []
         for data in self.multi_data:
             parameters = []
             for parameter in data.parameters:
                 parameters.append(parameter.epsilon._value)
                 parameters.append(parameter.rmin_half._value)
             all_parameters.append(parameters)
+        for data in self.failed_data:
+            parameters = []
+            for parameter in data.parameters:
+                parameters.append(parameter.epsilon._value)
+                parameters.append(parameter.rmin_half._value)
+            failed_parameters.append(parameters)
+        for data in self.bad_density_data:
+            parameters = []
+            for parameter in data.parameters:
+                parameters.append(parameter.epsilon._value)
+                parameters.append(parameter.rmin_half._value)
+            bad_density_parameters.append(parameters)
         all_parameters = np.asarray(all_parameters)
+        failed_parameters = np.asarray(failed_parameters)
+        bad_density_parameters = np.asarray(bad_density_parameters)
         property_measurements = np.asarray(property_measurements)
         property_uncertainties = np.asarray(property_uncertainties)
-
+        if len(failed_parameters) > 0:
+            self.failed_params_values = pandas.DataFrame(failed_parameters, columns=parameter_labels)
         self.parameter_values = pandas.DataFrame(all_parameters, columns=parameter_labels)
+        if len(bad_density_parameters) > 0:
+            self.bad_density_param_values = pandas.DataFrame(bad_density_parameters, columns=parameter_labels)
+        self.plot_parameter_sets()
         self.property_measurements = pandas.DataFrame(property_measurements, columns=property_labels)
         self.property_uncertainties = pandas.DataFrame(property_uncertainties, columns=property_labels)
 
@@ -168,10 +194,6 @@ class ParameterSetDataMultiplex:
                 (surrogate_measurements[0].shape[0], 1))
             individual_property_uncertainties = surrogate_uncertainties[i].reshape(
                 (surrogate_uncertainties[0].shape[0], 1))
-            # model = GPSurrogateModel(parameter_data=self.parameter_values.values,
-            #                          property_data=individual_property_measurements)
-            # model.build_surrogate_gpflow()
-            # model.model.train_targets = model.model.train_targets.detach()
             model = build_surrogate_lightweight(self.parameter_values.values, individual_property_measurements,
                                                 individual_property_uncertainties, self.device)
             botorch_model = build_surrogate_lightweight_botorch(self.parameter_values.values,
@@ -179,7 +201,7 @@ class ParameterSetDataMultiplex:
                                                                 individual_property_uncertainties, self.device)
             if do_cross_validation is True:
                 build_surrogates_loo_cv(self.parameter_values.values, individual_property_measurements,
-                                        individual_property_uncertainties, self.property_labels[i])
+                                        individual_property_uncertainties, self.property_labels[i],self.fl)
             model.train_targets = model.train_targets.detach()
             surrogates.append(model)
             botorch_surrogates.append(botorch_model)
@@ -187,7 +209,6 @@ class ParameterSetDataMultiplex:
         self.botorch_surrogates = botorch_surrogates
 
     def build_multisurrogates(self, do_cross_validation=True):
-        surrogates = []
 
         if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
             raise ValueError('Number of Parameter Sets and Measurement Sets must agree!')
@@ -195,13 +216,13 @@ class ParameterSetDataMultiplex:
             num_surrogates = self.property_measurements.shape[1]
         surrogate_measurements = self.property_measurements.values.transpose()
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
-
+        self.parameter_values = self.parameter_values.iloc[:, :-1]
         self.multisurrogate = build_multisurrogate_lightweight_botorch(self.parameter_values.values,
                                                                        surrogate_measurements,
                                                                        surrogate_uncertainties, self.device)
         if do_cross_validation is True:
             build_surrogates_loo_cv(self.parameter_values.values, surrogate_measurements,
-                                    surrogate_uncertainties, self.property_labels)
+                                    surrogate_uncertainties, self.property_labels, self.parameter_labels)
 
     def evaluate_parameter_set(self, parameter_set):
 
@@ -227,11 +248,46 @@ class ParameterSetDataMultiplex:
         ranges = np.asarray(ranges)
         return ranges
 
+    def plot_parameter_sets(self):
+        all_params = []
+        df_1 = self.parameter_values
+        import textwrap
+        import seaborn
+        wrapper = textwrap.TextWrapper(width=25)
+        columns = {}
+        for i, column in enumerate(df_1.columns):
+            columns[column] = wrapper.fill(column)
+        df_1.rename(columns=columns, inplace=True)
+        df_1['status'] = np.tile(['completed'], df_1.shape[0])
+        all_params.append(df_1)
+        if hasattr(self, 'failed_params_values'):
+            df_2 = self.failed_params_values
+            wrapper = textwrap.TextWrapper(width=25)
+            columns = {}
+            for i, column in enumerate(df_2.columns):
+                columns[column] = wrapper.fill(column)
+            df_2.rename(columns=columns, inplace=True)
+            df_2['status'] = np.tile(['failed'], df_2.shape[0])
+            all_params.append(df_2)
+        if hasattr(self, 'bad_density_param_values'):
+            df_3 = self.bad_density_param_values
+            wrapper = textwrap.TextWrapper(width=25)
+            columns = {}
+            for i, column in enumerate(df_3.columns):
+                columns[column] = wrapper.fill(column)
+            df_3.rename(columns=columns, inplace=True)
+            df_3['status'] = np.tile(['low density'], df_3.shape[0])
+            all_params.append(df_3)
+        df = pandas.concat(all_params, axis=0, ignore_index=True)
+        pairplot = seaborn.pairplot(df, corner=True, plot_kws=dict(marker="x", linewidth=3), hue='status',
+                                    diag_kind="hist")
+        os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
+        pairplot.savefig(os.path.join('result', 'properties', 'figures', 'params.png'), dpi=300)
+        plt.close()
+
     def plot_properties(self):
         os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
         x_range = np.linspace(0, self.property_measurements.shape[0] - 1, num=self.property_measurements.shape[0])
-
-
 
         for i, column in enumerate(self.property_measurements.columns):
             plt.errorbar(x_range, self.property_measurements[column].values,
@@ -246,7 +302,7 @@ class ParameterSetDataMultiplex:
                 f'{str(self.properties.properties[i].substance)}: {self.properties.properties[i].value} +/- {self.properties.properties[i].uncertainty}')
             plt.xlabel('Parameter Set')
             plt.ylabel('Property Value')
-            label = f'{str(self.properties.properties[i].substance)}_{self.properties.properties[i].value}'
+            # label = f'{str(self.properties.properties[i].substance)}_{self.properties.properties[i].value}'
             plt.savefig(os.path.join('result', 'properties', 'figures', 'property_' + str(i) + '.png'), dpi=300)
             plt.clf()
 
@@ -265,41 +321,34 @@ class ParameterSetDataMultiplex:
         for i in range(self.property_measurements.values.shape[0]):
             hvap_estimate = []
             density_estimate = []
-            for j in range(len(self.property_measurements.values[0,:])):
+            for j in range(len(self.property_measurements.values[0, :])):
                 if self.property_measurements.columns[j].endswith('EnthalpyOfVaporization'):
-                    hvap_estimate.append(self.property_measurements.values[i,j])
+                    hvap_estimate.append(self.property_measurements.values[i, j])
                 elif self.property_measurements.columns[j].endswith('Density'):
-                    density_estimate.append(self.property_measurements.values[i,j])
+                    density_estimate.append(self.property_measurements.values[i, j])
             hvap_estimate = np.asarray(hvap_estimate)
             density_estimate = np.asarray(density_estimate)
-            hvap_rmse.append(np.mean(np.sqrt(np.square(hvap_reference-hvap_estimate))))
-            density_rmse.append(np.mean(np.sqrt(np.square(density_reference-density_estimate))))
+            hvap_rmse.append(np.mean(np.sqrt(np.square(hvap_reference - hvap_estimate))))
+            density_rmse.append(np.mean(np.sqrt(np.square(density_reference - density_estimate))))
         return hvap_rmse, density_rmse
 
-    def calculate_surrogate_simulation_deviation(self):
-        params = self.parameter_values.values
+    def calculate_surrogate_simulation_deviation(self,benchmark_dataplex):
+        params = benchmark_dataplex.parameter_values.values
         prediction_values = []
         prediction_uncertainties = []
         for i in range(params.shape[0]):
             with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                     True) and gpytorch.settings.fast_pred_var(True):
-                eval = self.multisurrogate(torch.tensor(params[i,:]).unsqueeze(-1).T)
+                eval = self.multisurrogate(torch.tensor(params[i, :]).unsqueeze(-1).T)
             prediction_values.append(eval.mean.detach().numpy())
             prediction_uncertainties.append(eval.variance.detach().numpy())
         prediction_values = np.asarray(prediction_values).squeeze(2)
         prediction_uncertainties = np.asarray(prediction_uncertainties).squeeze(2)
-        deviation = abs(prediction_values - self.property_measurements.values)
-        percent_deviation = 100 * deviation / self.property_measurements.values
-        comb_uncert = prediction_uncertainties * 1.96 + self.property_uncertainties.values
+        deviation = abs(prediction_values - benchmark_dataplex.property_measurements.values)
+        percent_deviation = 100 * deviation / benchmark_dataplex.property_measurements.values
+        comb_uncert = prediction_uncertainties * 1.96 + benchmark_dataplex.property_uncertainties.values
         in_uncert = deviation / comb_uncert < 1
         return deviation, percent_deviation, comb_uncert, in_uncert
-
-
-
-
-
-
-
 
 
 def get_training_data_new(data, properties, parameters, device):
@@ -314,10 +363,11 @@ def get_training_data_new(data, properties, parameters, device):
     after = len(dataplex.multi_data)
     print(f'Removed {before - after} incomplete or errored datasets')
     dataplex.align_property_data()
+    dataplex.plot_parameter_sets()
     dataplex.plot_properties()
     print(f'Proceeding to build surrogates with {len(dataplex.multi_data)} Datasets')
     dataplex.build_multisurrogates()
-    dataplex.build_surrogates()
+    # dataplex.build_surrogates()
     return dataplex
 
 
