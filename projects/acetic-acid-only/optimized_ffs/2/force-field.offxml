@@ -301,7 +301,7 @@
 	</ImproperTorsions>
 	<vdW version="0.3" potential="Lennard-Jones-12-6" combining_rules="Lorentz-Berthelot" scale12="0.0" scale13="0.0" scale14="0.5" scale15="1.0" cutoff="9.0 * angstrom" switch_width="1.0 * angstrom" method="cutoff">
 		<Atom smirks="[#1:1]" epsilon="0.0157 * mole**-1 * kilocalorie" id="n1" rmin_half="0.6 * angstrom"></Atom>
-		<Atom smirks="[#1:1]-[#6X4]" epsilon="0.0151505 * mole**-1 * kilocalorie" id="n2" rmin_half="1.4803085000000002 * angstrom"></Atom>
+		<Atom smirks="[#1:1]-[#6X4]" epsilon="0.01570006141113949 * mole**-1 * kilocalorie" id="n2" rmin_half="1.4869834217435187 * angstrom"></Atom>
 		<Atom smirks="[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]" epsilon="0.0157 * mole**-1 * kilocalorie" id="n3" rmin_half="1.387 * angstrom"></Atom>
 		<Atom smirks="[#1:1]-[#6X4](-[#7,#8,#9,#16,#17,#35])-[#7,#8,#9,#16,#17,#35]" epsilon="0.0157 * mole**-1 * kilocalorie" id="n4" rmin_half="1.287 * angstrom"></Atom>
 		<Atom smirks="[#1:1]-[#6X4](-[#7,#8,#9,#16,#17,#35])(-[#7,#8,#9,#16,#17,#35])-[#7,#8,#9,#16,#17,#35]" epsilon="0.0157 * mole**-1 * kilocalorie" id="n5" rmin_half="1.187 * angstrom"></Atom>
@@ -313,12 +313,12 @@
 		<Atom smirks="[#1:1]-[#7]" epsilon="0.0157 * mole**-1 * kilocalorie" id="n11" rmin_half="0.6 * angstrom"></Atom>
 		<Atom smirks="[#1:1]-[#8]" epsilon="5.27e-05 * mole**-1 * kilocalorie" id="n12" rmin_half="0.3 * angstrom"></Atom>
 		<Atom smirks="[#1:1]-[#16]" epsilon="0.0157 * mole**-1 * kilocalorie" id="n13" rmin_half="0.6 * angstrom"></Atom>
-		<Atom smirks="[#6:1]" epsilon="0.089354 * mole**-1 * kilocalorie" id="n14" rmin_half="1.82691 * angstrom"></Atom>
+		<Atom smirks="[#6:1]" epsilon="0.08600075135300302 * mole**-1 * kilocalorie" id="n14" rmin_half="1.9079981732364983 * angstrom"></Atom>
 		<Atom smirks="[#6X2:1]" epsilon="0.21 * mole**-1 * kilocalorie" id="n15" rmin_half="1.908 * angstrom"></Atom>
-		<Atom smirks="[#6X4:1]" epsilon="0.1071026 * mole**-1 * kilocalorie" id="n16" rmin_half="1.8345419999999997 * angstrom"></Atom>
-		<Atom smirks="[#8:1]" epsilon="0.219555 * mole**-1 * kilocalorie" id="n17" rmin_half="1.6188394 * angstrom"></Atom>
-		<Atom smirks="[#8X2H0+0:1]" epsilon="0.17824500000000001 * mole**-1 * kilocalorie" id="n18" rmin_half="1.72158325 * angstrom"></Atom>
-		<Atom smirks="[#8X2H1+0:1]" epsilon="0.2113468 * mole**-1 * kilocalorie" id="n19" rmin_half="1.8010265 * angstrom"></Atom>
+		<Atom smirks="[#6X4:1]" epsilon="0.1094012166285648 * mole**-1 * kilocalorie" id="n16" rmin_half="1.9079565630148563 * angstrom"></Atom>
+		<Atom smirks="[#8:1]" epsilon="0.20999955966234082 * mole**-1 * kilocalorie" id="n17" rmin_half="1.661219599696253 * angstrom"></Atom>
+		<Atom smirks="[#8X2H0+0:1]" epsilon="0.16999933226352704 * mole**-1 * kilocalorie" id="n18" rmin_half="1.6837000466087952 * angstrom"></Atom>
+		<Atom smirks="[#8X2H1+0:1]" epsilon="0.21040271283396458 * mole**-1 * kilocalorie" id="n19" rmin_half="1.7210010631887351 * angstrom"></Atom>
 		<Atom smirks="[#7:1]" epsilon="0.17 * mole**-1 * kilocalorie" id="n20" rmin_half="1.824 * angstrom"></Atom>
 		<Atom smirks="[#16:1]" epsilon="0.25 * mole**-1 * kilocalorie" id="n21" rmin_half="2.0 * angstrom"></Atom>
 		<Atom smirks="[#15:1]" epsilon="0.2 * mole**-1 * kilocalorie" id="n22" rmin_half="2.1 * angstrom"></Atom>

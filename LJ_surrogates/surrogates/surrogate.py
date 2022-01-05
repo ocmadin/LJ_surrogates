@@ -356,7 +356,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
             for j in range(len(parameter_labels)):
 
                 if k == j:
-                    ax[k][j].scatter(test_X[:,0,k].cpu().numpy(),test_Y[:,0], c=difference, cmap='seismic', ls='--', marker=',')
+                    ax[k][j].scatter(test_X[:,0,k].cpu().numpy(),test_Y[:,i], c=difference, cmap='seismic', ls='--', marker=',')
                 elif k > j:
                     s = ax[k][j].scatter(test_X[:,0,k].cpu().numpy(),test_X[:,0,j].cpu().numpy(),c=difference,cmap='seismic', marker=',')
                     if k == len(parameter_labels)-1:
