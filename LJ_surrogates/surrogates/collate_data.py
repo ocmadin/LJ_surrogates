@@ -31,7 +31,7 @@ def collate_physical_property_data(directory, smirks, initial_forcefield, proper
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
     properties = PhysicalPropertyDataSet.from_json(properties_filepath)
     dataplex = get_training_data_new(data, properties, initial_parameters, device)
-    dataplex.plot_properties()
+    # dataplex.plot_properties()
     # properties_all = get_training_data(data)
     return dataplex
 
@@ -366,6 +366,18 @@ def get_training_data_new(data, properties, parameters, device):
     dataplex.plot_parameter_sets()
     dataplex.plot_properties()
     print(f'Proceeding to build surrogates with {len(dataplex.multi_data)} Datasets')
+    dataplex.property_measurements.drop(columns=['CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization','CC(=O)O{solv}{x=1.000000}_Density'],inplace=True)
+    dataplex.property_uncertainties.drop(
+        columns=['CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization', 'CC(=O)O{solv}{x=1.000000}_Density'],inplace=True)
+    temp_properties = PhysicalPropertyDataSet()
+    for property in dataplex.properties.properties[1:19]:
+        temp_properties.add_properties(property)
+    for property in dataplex.properties.properties[20:]:
+        temp_properties.add_properties(property)
+    dataplex.properties = temp_properties
+    temp_labels = dataplex.property_labels[1:19]
+    temp_labels.extend(dataplex.property_labels[20:])
+    dataplex.property_labels=temp_labels
     dataplex.build_multisurrogates()
     # dataplex.build_surrogates()
     return dataplex
