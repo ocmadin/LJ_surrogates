@@ -122,6 +122,22 @@ class ParameterSetDataMultiplex:
         after = len(self.multi_data)
         print(f"Removed {before - after} datasets due to bad density measurments")
 
+    def prune_low_aa_hvaps(self):
+        print('Removing Low Energy Acetic Acid meaasurements')
+        before = len(self.multi_data)
+
+        self.bad_hvap_data = []
+        for i, property in enumerate(self.properties.properties):
+            if self.property_labels[i] == 'CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization':
+                to_pop = []
+                for j, measurement in enumerate(self.multi_data):
+                    if measurement.property_measurements.properties[i].value.m <= 60:
+                        to_pop.append(j)
+                for pop in sorted(to_pop, reverse=True):
+                    self.bad_hvap_data.append(self.multi_data[pop])
+                    del self.multi_data[pop]
+        after = len(self.multi_data)
+        print(f"Removed {before - after} datasets due to low acetic acid hvap measurments")
     def align_property_data(self):
         parameter_labels = []
         for parameter in self.parameters:
@@ -134,6 +150,7 @@ class ParameterSetDataMultiplex:
         self.parameter_labels = parameter_labels
         self.property_labels = property_labels
         self.prune_bad_densities()
+        self.prune_low_aa_hvaps()
         property_measurements = []
         property_uncertainties = []
         for data in self.multi_data:
@@ -208,7 +225,7 @@ class ParameterSetDataMultiplex:
         self.surrogates = surrogates
         self.botorch_surrogates = botorch_surrogates
 
-    def build_multisurrogates(self, do_cross_validation=True):
+    def build_multisurrogates(self, do_cross_validation=False):
 
         if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
             raise ValueError('Number of Parameter Sets and Measurement Sets must agree!')
@@ -332,6 +349,8 @@ class ParameterSetDataMultiplex:
             density_rmse.append(np.mean(np.sqrt(np.square(density_reference - density_estimate))))
         return hvap_rmse, density_rmse
 
+
+
     def calculate_surrogate_simulation_deviation(self,benchmark_dataplex):
         params = benchmark_dataplex.parameter_values.values
         prediction_values = []
@@ -366,19 +385,19 @@ def get_training_data_new(data, properties, parameters, device):
     dataplex.plot_parameter_sets()
     dataplex.plot_properties()
     print(f'Proceeding to build surrogates with {len(dataplex.multi_data)} Datasets')
-    dataplex.property_measurements.drop(columns=['CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization','CC(=O)O{solv}{x=1.000000}_Density'],inplace=True)
-    dataplex.property_uncertainties.drop(
-        columns=['CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization', 'CC(=O)O{solv}{x=1.000000}_Density'],inplace=True)
-    temp_properties = PhysicalPropertyDataSet()
-    for property in dataplex.properties.properties[1:19]:
-        temp_properties.add_properties(property)
-    for property in dataplex.properties.properties[20:]:
-        temp_properties.add_properties(property)
-    dataplex.properties = temp_properties
-    temp_labels = dataplex.property_labels[1:19]
-    temp_labels.extend(dataplex.property_labels[20:])
-    dataplex.property_labels=temp_labels
-    dataplex.build_multisurrogates()
+    # dataplex.property_measurements.drop(columns=['CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization','CC(=O)O{solv}{x=1.000000}_Density'],inplace=True)
+    # dataplex.property_uncertainties.drop(
+    #     columns=['CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization', 'CC(=O)O{solv}{x=1.000000}_Density'],inplace=True)
+    # temp_properties = PhysicalPropertyDataSet()
+    # for property in dataplex.properties.properties[1:19]:
+    #     temp_properties.add_properties(property)
+    # for property in dataplex.properties.properties[20:]:
+    #     temp_properties.add_properties(property)
+    # dataplex.properties = temp_properties
+    # temp_labels = dataplex.property_labels[1:19]
+    # temp_labels.extend(dataplex.property_labels[20:])
+    # dataplex.property_labels=temp_labels
+    dataplex.build_multisurrogates(do_cross_validation=False)
     # dataplex.build_surrogates()
     return dataplex
 
@@ -418,3 +437,46 @@ def canonicalize_dataset(dataset):
                 properties.append(property)
     dataset._properties = tuple(properties)
     return dataset
+
+
+def get_simulation_data(directory):
+    from openff.evaluator.storage.storage import BaseStoredData
+    data = []
+    for file in os.listdir(directory):
+        if file.endswith('.json'):
+            data.append(BaseStoredData.from_json(os.path.join(directory,file)))
+    return data
+
+
+def calculate_ff_rmses_surrogate(dataplex, parameter_values):
+    hvap_reference = []
+    density_reference = []
+    hvap_rmse = []
+    density_rmse = []
+    for property in dataplex.properties:
+        if type(property) == enthalpy.EnthalpyOfVaporization:
+            hvap_reference.append(property.value.m)
+        elif type(property) == density.Density:
+            density_reference.append(property.value.m)
+    hvap_reference = np.asarray(hvap_reference)
+    density_reference = np.asarray(density_reference)
+    surrogates = []
+    for i in range(parameter_values.shape[0]):
+        param_vec = torch.tensor(parameter_values[i]).unsqueeze(-1).T
+        surrogates.append(dataplex.multisurrogate(param_vec).mean.detach().numpy())
+    surrogates = np.asarray(surrogates).squeeze()
+    surrogates = pandas.DataFrame(surrogates,columns=dataplex.property_labels)
+
+    for i in range(surrogates.values.shape[0]):
+        hvap_estimate = []
+        density_estimate = []
+        for j in range(len(surrogates.values[0, :])):
+            if surrogates.columns[j].endswith('EnthalpyOfVaporization'):
+                hvap_estimate.append(surrogates.values[i, j])
+            elif surrogates.columns[j].endswith('Density'):
+                density_estimate.append(surrogates.values[i, j])
+        hvap_estimate = np.asarray(hvap_estimate)
+        density_estimate = np.asarray(density_estimate)
+        hvap_rmse.append(np.mean(np.sqrt(np.square(hvap_reference - hvap_estimate))))
+        density_rmse.append(np.mean(np.sqrt(np.square(density_reference - density_estimate))))
+    return hvap_rmse, density_rmse

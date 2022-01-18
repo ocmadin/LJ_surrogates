@@ -8,7 +8,7 @@ import copy
 import numpy as np
 from openff.toolkit.typing.engines.smirnoff.forcefield import ForceField
 from simtk import openmm, unit
-
+import time
 
 class ObjectiveFunction(torch.nn.Module):
     def __init__(self, multisurrogate, targets, initial_params):
@@ -95,6 +95,67 @@ class ConstrainedGaussianObjectiveFunction(ObjectiveFunction):
 
         return -(prior.item() + objective.item())
 
+
+class ConstrainedGaussianObjectiveFunctionNoSurrogate(ObjectiveFunction):
+    def __init__(self, multisurrogate, targets, initial_params, prior_width):
+        super().__init__(multisurrogate, targets, initial_params)
+        self.prior_width = prior_width
+
+    def forward(self, parameters):
+        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
+            torch.tensor(parameters).unsqueeze(-1).T)
+        prior = torch.sum(torch.distributions.Normal(loc=torch.tensor(self.flat_parameters).unsqueeze(-1).T,
+                                                     scale=self.prior_width * torch.tensor(
+                                                         self.flat_parameters).unsqueeze(
+                                                         -1).T).log_prob(torch.tensor(parameters).unsqueeze(-1).T))
+        objective = torch.sum(
+            torch.distributions.Normal(loc=self.experimental_values, scale=self.uncertainty_values).log_prob(
+                surrogate_predictions))
+
+        return -(prior.item() + objective.item())
+
+
+class LeastSquaresObjectiveFunction(ObjectiveFunction):
+
+    def forward(self, parameters):
+        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
+            torch.tensor(parameters).unsqueeze(-1).T)
+        comb_uncert = torch.sqrt(torch.square(self.uncertainty_values) + torch.square(surrogate_uncertainties))
+        objective = torch.square(surrogate_predictions - self.experimental_values) / self.experimental_values
+
+        return objective.sum().item()
+
+
+class ForceBalanceObjectiveFunction(ObjectiveFunction):
+    def __init__(self, multisurrogate, targets, initial_params, property_labels):
+        super().__init__(multisurrogate, targets, initial_params)
+        self.property_labels = property_labels
+        density_labels = []
+        hvap_labels = []
+        for i, label in enumerate(property_labels):
+            if label.endswith('Density'):
+                density_labels.append(i)
+            elif label.endswith('EnthalpyOfVaporization'):
+                hvap_labels.append(i)
+        self.hvap_labels = np.asarray(hvap_labels)
+        self.density_labels = np.asarray(density_labels)
+        self.hvap_measurements = self.experimental_values[self.hvap_labels]
+        self.density_measurements = self.experimental_values[self.density_labels]
+        self.hvap_denominator = 25.683
+        self.density_denominator = 0.0482*2
+
+    def forward(self, parameters):
+        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
+            torch.tensor(parameters).unsqueeze(-1).T)
+        surrogates_hvap = surrogate_predictions[self.hvap_labels]
+        surrogates_density = surrogate_predictions[self.density_labels]
+        density_objective = (1 / surrogates_density.shape[0]) * torch.sum(torch.square(
+            (self.density_measurements - surrogates_density) / self.density_denominator))
+        hvap_objective = (1 / surrogates_hvap.shape[0]) * torch.sum(torch.square(
+            (self.hvap_measurements - surrogates_hvap) / self.hvap_denominator))
+
+        objective = density_objective + hvap_objective
+        return objective.item()
 
 class Optimizer:
     def __init__(self, objective_function):
