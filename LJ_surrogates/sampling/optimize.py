@@ -157,6 +157,24 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
         objective = density_objective + hvap_objective
         return objective.item()
 
+    def forward_jac(self, parameters):
+        jacobian = torch.autograd.functional.jacobian(self.evaluate_parameter_set_multisurrogate,
+            torch.tensor(parameters).unsqueeze(-1).T)[0].squeeze()
+        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
+            torch.tensor(parameters).unsqueeze(-1).T)
+        jacobian_hvap = jacobian[self.hvap_labels]
+        jacobian_density = jacobian[self.density_labels]
+        surrogates_density = surrogate_predictions[self.density_labels]
+        surrogates_hvap = surrogate_predictions[self.hvap_labels]
+
+        obj_density_jacobian = -2 / (surrogates_density.shape[0] * self.density_denominator) * torch.sum(
+            ((self.density_measurements - surrogates_density) / self.density_denominator) * jacobian_density,axis=0)
+        obj_hvap_jacobian = -2 / (surrogates_hvap.shape[0] * self.hvap_denominator) * torch.sum(
+            ((self.hvap_measurements - surrogates_hvap) / self.hvap_denominator) * jacobian_hvap,axis=0)
+
+        objective_jacobian = obj_density_jacobian + obj_hvap_jacobian
+        return objective_jacobian.detach().numpy()
+
 class Optimizer:
     def __init__(self, objective_function):
         self.objective_function = objective_function

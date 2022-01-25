@@ -19,7 +19,7 @@ gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
 path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-100-1-0-0'
-benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-new-benchmark-100-1-0-0'
+benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-new-benchmark-expanded-100-1-0-0'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1-3-0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection-100-1-0-0.json'
@@ -39,8 +39,8 @@ abs_deviation, percent_deviation, comb_uncert, in_uncert = dataplex.calculate_su
 
 os.makedirs('benchmark',exist_ok=True)
 plt.close()
-plt.bar(['Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0','LJ Refit Mixtures'],hvap_rmse,label='Simulation RMSE',alpha = 0.5)
-plt.bar(['Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0','LJ Refit Mixtures'],hvap_surr_rmse,label='Surrogate RMSE',alpha = 0.5)
+plt.bar(['LJ Refit Mixtures','Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0'],hvap_rmse,label='Simulation RMSE',alpha = 0.5)
+plt.bar(['LJ Refit Mixtures','Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0'],hvap_surr_rmse,label='Surrogate RMSE',alpha = 0.5)
 plt.xlabel('Optimization')
 plt.ylabel('RMSE, kJ/mol')
 plt.title(r'$\Delta H_{vap}$ RMSE')
@@ -48,8 +48,8 @@ plt.legend()
 plt.savefig(os.path.join('benchmark','hvap_rmse.png'),dpi=300)
 plt.close()
 
-plt.bar(['Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0','LJ Refit Mixtures'],density_rmse,label='Simulation RMSE',alpha = 0.5)
-plt.bar(['Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0','LJ Refit Mixtures'],density_rmse,label='Surrogate RMSE',alpha = 0.5)
+plt.bar(['LJ Refit Mixtures','Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0'],density_rmse,label='Simulation RMSE',alpha = 0.5)
+plt.bar(['LJ Refit Mixtures','Surrogate DE','Surrogate L-BFGS-B','OpenFF 1.0.0'],density_rmse,label='Surrogate RMSE',alpha = 0.5)
 plt.xlabel('Optimization')
 plt.ylabel('RMSE, kJ/mol')
 plt.title(r'$\rho_L$ RMSE')

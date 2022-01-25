@@ -16,10 +16,10 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-10-1-0-0'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-iterative-20'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
-dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection-100-1-0-0.json'
+dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
@@ -77,6 +77,8 @@ params_to_simulate.append(objective.flat_parameters)
 params_to_simulate = np.asarray(params_to_simulate)
 
 
-new_bounds = [(params_to_simulate[1][i]-0.1*boundsrange[i],params_to_simulate[1][i] + 0.1*boundsrange[i]) for i,param in enumerate(params_to_simulate[1])]
+new_bounds = np.asarray([(params_to_simulate[1][i]-0.2*boundsrange[i],params_to_simulate[1][i] + 0.2*boundsrange[i]) for i,param in enumerate(params_to_simulate[1])])
+
+np.save('new_bounds.npy',new_bounds)
 
 hvap_rmse, density_rmse = calculate_ff_rmses_surrogate(dataplex, params_to_simulate)

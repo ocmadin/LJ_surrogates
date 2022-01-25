@@ -150,7 +150,7 @@ class ParameterSetDataMultiplex:
         self.parameter_labels = parameter_labels
         self.property_labels = property_labels
         self.prune_bad_densities()
-        self.prune_low_aa_hvaps()
+        # self.prune_low_aa_hvaps()
         property_measurements = []
         property_uncertainties = []
         for data in self.multi_data:
