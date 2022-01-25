@@ -16,7 +16,7 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-10-1-0-0'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-100-1-0-0'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection-100-1-0-0.json'
@@ -32,14 +32,20 @@ objective = ForceBalanceObjectiveFunction(dataplex.multisurrogate, dataplex.prop
 objective.flatten_parameters()
 
 initial_objective = objective.forward(objective.flat_parameters)
-
+jacobian = objective.forward_jac(objective.flat_parameters)
+simulation_opt = np.asarray(
+    [0.008766206, 1.46527, 0.080329, 1.998187, 0.0993459, 1.9809416, 0.20698197, 1.7208416, 0.16197438,
+     1.7737039, 0.2106341, 1.71455])
+DE_values = np.asarray([0.0079285 , 1.46571923, 0.09187845, 2.00240791, 0.0985694 ,
+       1.98904371, 0.20147424, 1.7404901 , 0.16501403, 1.76432761,
+       0.20605592, 1.70430578])
 bounds = []
 for column in dataplex.parameter_values.columns:
     minbound = min(dataplex.parameter_values[column].values)
     maxbound = max(dataplex.parameter_values[column].values)
     bounds.append((minbound, maxbound))
 
-# bounds = [(0.002, 0.025), (1.3, 1.6), (0.07, 0.1), (1.7, 2.1), (0.08, 0.14), (1.7, 2.1), (0.18, 0.24), (1.45, 1.85), (0.15, 0.19), (1.5, 1.85), (0.18, 0.24), (1.5, 1.9)]
+bounds = [(0.002, 0.025), (1.3, 1.6), (0.07, 0.1), (1.7, 2.1), (0.08, 0.14), (1.7, 2.1), (0.18, 0.24), (1.45, 1.85), (0.15, 0.19), (1.5, 1.85), (0.18, 0.24), (1.5, 1.9)]
 boundsrange = []
 for tuple in bounds:
     boundsrange.append(tuple[1]-tuple[0])
@@ -47,28 +53,36 @@ boundsrange = np.asarray(boundsrange)
 
 objs = []
 params = []
-objs_lm = []
-params_lm = []
+objs_lbfgsb = []
+params_lbfgsb = []
+objs_bfgs = []
+params_bfgs = []
+objs_ncg = []
+params_ncg = []
+
+def callbackF(objective):
+    print(objective)
 
 for i in range(5):
-    result_l_bfgs_b = minimize(objective, objective.flat_parameters, bounds=bounds,
-                               options={'maxfun': 50000, 'gtol': 1e-8, 'maxls': 50})
+    result_l_bfgs_b = minimize(objective,x0=objective.flat_parameters, jac=objective.forward_jac, bounds=bounds, method='L-BFGS-B')
     before = time.time()
     result_de = differential_evolution(objective, bounds, popsize=20, tol=0.001, recombination=0.9)
     after = time.time()
     print(f'DE Time: {after - before} seconds')
     objs.append(result_de.fun)
     params.append(result_de.x)
-    objs_lm.append(result_l_bfgs_b.fun)
-    params_lm.append(result_l_bfgs_b.x)
-
-simulation_opt = np.asarray(
-    [0.008766206, 1.46527, 0.080329, 1.998187, 0.0993459, 1.9809416, 0.20698197, 1.7208416, 0.16197438,
-     1.7737039, 0.2106341, 1.71455])
+    objs_lbfgsb.append(result_l_bfgs_b.fun)
+    params_lbfgsb.append(result_l_bfgs_b.x)
+    result_ncg = minimize(objective, x0=objective.flat_parameters,method='Newton-CG', jac=objective.forward_jac)
+    objs_ncg.append(result_ncg.fun)
+    params_ncg.append(result_ncg.x)
+    result_bfgs = minimize(objective,objective.flat_parameters,method='BFGS', jac=objective.forward_jac)
+    objs_bfgs.append(result_bfgs.fun)
+    params_bfgs.append(result_bfgs.x)
 
 simulation_objective = objective.forward(simulation_opt)
 
-params_to_simulate = [simulation_opt, params[np.argmin(objs)], params_lm[np.argmin(objs_lm)]]
+params_to_simulate = [simulation_opt, params[np.argmin(objs)], params_lbfgsb[np.argmin(objs_lbfgsb)], params_ncg[np.argmin(objs_ncg)]]
 
 create_forcefields_from_optimized_params(params_to_simulate, objective.flat_parameter_names, 'openff-1.0.0.offxml')
 

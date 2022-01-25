@@ -7,8 +7,9 @@ import numpy as np
 import argparse
 
 
-def main(n_samples, output_directory, forcefield, data_filepath):
-    param_range = [[0.5, 1.5], [0.95, 1.05], [0.9, 1.1], [0.95, 1.05], [0.9, 1.1], [0.95, 1.05], [0.95, 1.05], [0.95, 1.05],
+def main(n_samples, output_directory, forcefield, data_filepath, bounds, absolute):
+    param_range = [[0.5, 1.5], [0.95, 1.05], [0.9, 1.1], [0.95, 1.05], [0.9, 1.1], [0.95, 1.05], [0.95, 1.05],
+                   [0.95, 1.05],
                    [0.95, 1.05], [0.95, 1.05], [0.95, 1.05], [0.95, 1.05]]
     smirks = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
     if data_filepath.endswith('.csv'):
@@ -20,9 +21,9 @@ def main(n_samples, output_directory, forcefield, data_filepath):
     else:
         raise TypeError('File should either be a dataset in the format of a csv or json')
     data_set.json('test-set-collection.json')
-
-    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, np.asarray(param_range),
-                        nonuniform_ranges=True)
+    bounds = np.load(bounds)
+    vary_parameters_lhc(forcefield, n_samples, output_directory, smirks, bounds,
+                        nonuniform_ranges=True, absolute_ranges=absolute)
 
     for folder in os.listdir(output_directory):
         shutil.copy2('test-set-collection.json', os.path.join(output_directory, folder))
@@ -83,11 +84,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--range",
         "-r",
-        type=list,
+        type=str,
         help="Parameter Range (decimal)",
+        required=False,
+        default=1,
+    )
+    parser.add_argument(
+        "--absolute",
+        "-a",
+        type=bool,
+        help="Absolute parameter range",
         required=False,
         default=1,
     )
     args = parser.parse_args()
 
-    main(args.samples, args.output_directory, args.forcefield, args.dataset)
+    main(args.samples, args.output_directory, args.forcefield, args.dataset, args.range, args.absolute)
