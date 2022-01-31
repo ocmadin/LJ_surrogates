@@ -12,8 +12,6 @@ import time
 class likelihood_function:
     def __init__(self, dataplex, device):
         self.device = torch.device(device)
-        self.surrogates = dataplex.surrogates
-        self.botorch_surrogates = dataplex.botorch_surrogates
         self.multisurrogate = dataplex.multisurrogate
         self.experimental_properties = dataplex.properties
         self.parameters = dataplex.initial_parameters

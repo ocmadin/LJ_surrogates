@@ -13,7 +13,7 @@ def plot_sampling_boundaries_1D(x_values, ranges, **kwargs):
     plt.axvline(max(x_values), ls='--', color='k', lw=1)
 
 
-def plot_triangle(params, likelihood, ranges, opt_params, n, boundaries=True, maxima=False):
+def plot_triangle(params, likelihood, ranges, opt_params, n, boundaries=True, maxima=False, show=False):
     df = pandas.DataFrame(params[:-1], columns=likelihood.flat_parameter_names)
     df2 = pandas.DataFrame(np.expand_dims(params[-1], axis=0), columns=likelihood.flat_parameter_names)
     wrapper = textwrap.TextWrapper(width=25)
@@ -37,9 +37,10 @@ def plot_triangle(params, likelihood, ranges, opt_params, n, boundaries=True, ma
                 for param_set in opt_params:
                     pairplot.axes[i][j].scatter(param_set[j], param_set[i], marker='x', color='k')
     plt.tight_layout()
+    if show is True:
+        plt.show()
     pairplot.savefig(os.path.join('result/figures', 'trace_with_sampling_boundaries.png'), dpi=300)
     # pairplot.savefig('trace_with_opt.png', dpi=300)
-
     plt.close()
 
 
@@ -48,14 +49,14 @@ def plot_parameter_changes(optimized_params, original_params, parameter_labels, 
     percentages = []
     for i, param_set in enumerate(optimized_params):
         if i > 1:
-            plt.plot(100 * param_set / original_params, label=optimization_labels[i],ls='-.',alpha=0.4,color='b')
+            plt.plot(100 * param_set / original_params, label=optimization_labels[i], ls='-.', alpha=0.4, color='b')
         else:
-            plt.plot(100 * param_set / original_params,label=optimization_labels[i])
+            plt.plot(100 * param_set / original_params, label=optimization_labels[i])
         percentages.append(100 * param_set / original_params)
     plt.axhline(100, ls='--', color='k', label='Original force field')
-    x = np.linspace(0,11,12)
+    x = np.linspace(0, 11, 12)
     plt.gcf().subplots_adjust(bottom=0.3)
-    plt.xticks(x,parameter_labels,rotation='vertical')
+    plt.xticks(x, parameter_labels, rotation='vertical')
     plt.xlabel('Parameter')
     plt.ylabel('% Change from original force field')
     plt.title('Parameter Changes')

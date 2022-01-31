@@ -45,7 +45,7 @@ for column in dataplex.parameter_values.columns:
     maxbound = max(dataplex.parameter_values[column].values)
     bounds.append((minbound, maxbound))
 
-bounds = [(0.002, 0.025), (1.3, 1.6), (0.07, 0.1), (1.7, 2.1), (0.08, 0.14), (1.7, 2.1), (0.18, 0.24), (1.45, 1.85), (0.15, 0.19), (1.5, 1.85), (0.18, 0.24), (1.5, 1.9)]
+# bounds = [(0.002, 0.025), (1.3, 1.6), (0.07, 0.1), (1.7, 2.1), (0.08, 0.14), (1.7, 2.1), (0.18, 0.24), (1.45, 1.85), (0.15, 0.19), (1.5, 1.85), (0.18, 0.24), (1.5, 1.9)]
 boundsrange = []
 for tuple in bounds:
     boundsrange.append(tuple[1]-tuple[0])

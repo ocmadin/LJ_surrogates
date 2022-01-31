@@ -150,7 +150,7 @@ class ParameterSetDataMultiplex:
         self.parameter_labels = parameter_labels
         self.property_labels = property_labels
         self.prune_bad_densities()
-        # self.prune_low_aa_hvaps()
+        self.prune_low_aa_hvaps()
         property_measurements = []
         property_uncertainties = []
         for data in self.multi_data:
@@ -265,7 +265,7 @@ class ParameterSetDataMultiplex:
         ranges = np.asarray(ranges)
         return ranges
 
-    def plot_parameter_sets(self):
+    def plot_parameter_sets(self, show=False):
         all_params = []
         df_1 = self.parameter_values
         import textwrap
@@ -300,9 +300,11 @@ class ParameterSetDataMultiplex:
                                     diag_kind="hist")
         os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
         pairplot.savefig(os.path.join('result', 'properties', 'figures', 'params.png'), dpi=300)
+        if show is True:
+            plt.show()
         plt.close()
 
-    def plot_properties(self):
+    def plot_properties(self, show=False):
         os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
         x_range = np.linspace(0, self.property_measurements.shape[0] - 1, num=self.property_measurements.shape[0])
 
@@ -321,6 +323,8 @@ class ParameterSetDataMultiplex:
             plt.ylabel('Property Value')
             # label = f'{str(self.properties.properties[i].substance)}_{self.properties.properties[i].value}'
             plt.savefig(os.path.join('result', 'properties', 'figures', 'property_' + str(i) + '.png'), dpi=300)
+            if show is True:
+                plt.show()
             plt.clf()
 
     def calculate_ff_rmses(self):
