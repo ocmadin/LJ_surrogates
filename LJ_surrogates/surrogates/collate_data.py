@@ -150,7 +150,7 @@ class ParameterSetDataMultiplex:
         self.parameter_labels = parameter_labels
         self.property_labels = property_labels
         self.prune_bad_densities()
-        self.prune_low_aa_hvaps()
+        # self.prune_low_aa_hvaps()
         property_measurements = []
         property_uncertainties = []
         for data in self.multi_data:
@@ -427,18 +427,26 @@ def canonicalize_dataset(dataset):
     if not isinstance(dataset, PhysicalPropertyDataSet):
         raise TypeError('Dataset must be a PhysicalPropertyDataSet object')
     ids = []
-    for property in dataset.properties:
-        if property.id.startswith('0'):
-            property.id = property.id[1:]
+    for i,property in enumerate(dataset.properties):
+        if property.id.startswith('000'):
+            dataset.properties[i].id = property.id[3:]
+        elif property.id.startswith('00'):
+            dataset.properties[i].id = property.id[2:]
+        elif property.id.startswith('0'):
+            dataset.properties[i].id = property.id[1:]
+
+
         ids.append(int(property.id, 16))
     ids = sorted(ids)
     for i, id in enumerate(ids):
         ids[i] = format(id, 'x')
     properties = []
+    property_ids = []
     for id in ids:
         for property in dataset.properties:
             if property.id == id:
                 properties.append(property)
+                property_ids.append(id)
     dataset._properties = tuple(properties)
     return dataset
 

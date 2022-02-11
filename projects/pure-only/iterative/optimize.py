@@ -16,7 +16,7 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-iterative-50'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-iterative-30'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
@@ -25,13 +25,13 @@ device = 'cpu'
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
 params_1 = np.asarray([0.0108,1.554,0.0783,1.956,0.1108,1.8995,0.2113,1.736,0.1658,1.759,0.2099,1.726])
-params_2 = np.load('4th_round.npy')[1]
+# params_2 = np.load('4th_round.npy')[1]
 # objective = ConstrainedGaussianObjectiveFunctionNoSurrogate(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters, 0.001)
 objective = ForceBalanceObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
                                           dataplex.property_labels)
 
 objective.flatten_parameters()
-objective.flat_parameters = params_2
+# objective.flat_parameters = params_2
 initial_objective = objective.forward(objective.flat_parameters)
 
 bounds = []
@@ -40,7 +40,7 @@ for column in dataplex.parameter_values.columns:
     maxbound = max(dataplex.parameter_values[column].values)
     bounds.append((minbound, maxbound))
 
-# bounds = [(0.002, 0.025), (1.3, 1.6), (0.07, 0.1), (1.7, 2.1), (0.08, 0.14), (1.7, 2.1), (0.18, 0.24), (1.45, 1.85), (0.15, 0.19), (1.5, 1.85), (0.18, 0.24), (1.5, 1.9)]
+# bounds = [(0.004, 0.025), (1.0, 2), (0.05, 0.2), (1.5, 3), (0.05, 0.2), (1.5, 2.5), (0.15, 0.30), (1.2, 2.0), (0.1, 0.25), (1.2, 2.5), (0.1, 0.5), (1.2, 2.5)]
 boundsrange = []
 for tuple in bounds:
     boundsrange.append(tuple[1]-tuple[0])
@@ -71,9 +71,13 @@ simulation_objective = objective.forward(simulation_opt)
 
 params_to_simulate = [simulation_opt, params[np.argmin(objs)], params_l_bfgs_b[np.argmin(objs_l_bfgs_b)]]
 
+objs_to_simulate = [simulation_objective,min(objs), min(objs_l_bfgs_b)]
+
 create_forcefields_from_optimized_params(params_to_simulate, objective.flat_parameter_names, 'openff-1.0.0.offxml')
 
 params_to_simulate.append(objective.flat_parameters)
+
+objs_to_simulate.append(objective.forward(objective.flat_parameters))
 
 params_to_simulate = np.asarray(params_to_simulate)
 
@@ -83,4 +87,12 @@ new_bounds = np.asarray([(params_to_simulate[1][i]-0.1*boundsrange[i],params_to_
 np.save('new_bounds.npy',new_bounds)
 np.save('new_parameters.npy',params_to_simulate[1])
 
-hvap_rmse, density_rmse = calculate_ff_rmses_surrogate(dataplex, params_to_simulate)
+
+
+all_to_simulate = np.load('../monolith/all_monolith_params.npy')
+hvap_rmse, density_rmse = calculate_ff_rmses_surrogate(dataplex, all_to_simulate)
+
+results = []
+rmses = []
+for i in range(all_to_simulate.shape[1]):
+    results.append(objective.forward(all_to_simulate[i]))

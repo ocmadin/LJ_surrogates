@@ -343,6 +343,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
         comb_uncert = uncertainties[:,i]*1.96 + test_Y_err[:,i]
         in_uncert = difference/comb_uncert < 1
         summary_df.append([RMSE,max(abs(means[:,i] - test_Y[:,i])),avg_surrogate_uncertainty,max(uncertainties[:,i]),in_uncert.sum()*100/len(in_uncert)])
+        plt.close()
         plt.errorbar(means[:,i], test_Y[:,i], xerr=1.96 * uncertainties[:,i], yerr=test_Y_err[:,i], ls='none',
                      marker='.')
         plt.plot(xax, yax, color='k', lw=0.5)
