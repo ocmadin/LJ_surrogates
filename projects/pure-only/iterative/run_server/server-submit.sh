@@ -2,7 +2,7 @@
 
 # Set the job name and wall time / memory limit
 #BSUB -J server
-#BSUB -W 168:00
+#BSUB -W 48:00
 #BSUB -M 8
 
 # Set the output and error output paths.
@@ -18,4 +18,4 @@ conda activate LJ_surrogates
 conda env export > conda_env.yaml
 
 # Run the commands
-python run_calculations.py -nwork 20 -ncpus 1 -ngpus 1 -dir '../modified_force_fields' -p 8004
+python run_calculations.py -nwork 20 -ncpus 1 -ngpus 1 -dir '../modified_force_fields' -p 8003

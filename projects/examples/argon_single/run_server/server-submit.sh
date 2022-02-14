@@ -18,4 +18,4 @@ conda activate LJ_surrogates
 conda env export > conda_env.yaml
 
 # Run the commands
-python run_calculations.py -nwork 60 -ncpus 1 -ngpus 1 -dir '../modified_force_fields' -p 8000
+python run_calculations.py -nwork 5 -ncpus 1 -ngpus 1 -dir '../modified_force_fields' -p 8001
