@@ -1,3 +1,5 @@
+import copy
+
 import torch.cuda
 
 from LJ_surrogates.surrogates.collate_data import collate_physical_property_data, calculate_ff_rmses_surrogate
@@ -19,7 +21,7 @@ gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
 path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-100-1-0-0'
-benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-new-benchmark-expanded-100-1-0-0'
+benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-new-benchmark-100-1-0-0'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1-3-0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection-100-1-0-0.json'
@@ -31,6 +33,8 @@ dataplex.plot_properties()
 
 benchmark_dataplex = collate_physical_property_data(benchmark_path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
+
+# benchmark_dataplex = copy.deepcopy(dataplex)
 
 hvap_rmse, density_rmse = benchmark_dataplex.calculate_ff_rmses()
 hvap_surr_rmse, density_surr_rmse = calculate_ff_rmses_surrogate(dataplex, benchmark_dataplex.parameter_values.values)

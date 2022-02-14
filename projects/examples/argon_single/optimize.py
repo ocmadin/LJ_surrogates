@@ -15,7 +15,7 @@ import seaborn
 
 gc.collect()
 torch.cuda.empty_cache()
-path = '../../../data/argon-single-50-small'
+path = '../../../data/argon_single_new_20'
 smirks_types_to_change = ['[#18:1]']
 forcefield = 'openff-1-3-0-argon.offxml'
 dataset_json = 'argon_single.json'
@@ -26,8 +26,8 @@ dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefie
 # dataplex.initial_parameters['[#18:1]'][0]._value = 0.35
 # dataplex.initial_parameters['[#18:1]'][1]._value = 1.5
 
-objective = ConstrainedGaussianObjectiveFunction(dataplex.surrogates, dataplex.multisurrogate, dataplex.properties,
-                                                 dataplex.initial_parameters, 0.1)
+objective = ConstrainedGaussianObjectiveFunction(dataplex.multisurrogate, dataplex.properties,
+                                                 dataplex.initial_parameters, 0.01)
 objective.flatten_parameters()
 bounds = []
 for column in dataplex.parameter_values.columns:

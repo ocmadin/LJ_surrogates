@@ -265,7 +265,7 @@ class ParameterSetDataMultiplex:
         ranges = np.asarray(ranges)
         return ranges
 
-    def plot_parameter_sets(self):
+    def plot_parameter_sets(self, show=False):
         all_params = []
         df_1 = self.parameter_values
         import textwrap
@@ -300,9 +300,11 @@ class ParameterSetDataMultiplex:
                                     diag_kind="hist")
         os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
         pairplot.savefig(os.path.join('result', 'properties', 'figures', 'params.png'), dpi=300)
+        if show is True:
+            plt.show()
         plt.close()
 
-    def plot_properties(self):
+    def plot_properties(self, show=False):
         os.makedirs(os.path.join('result', 'properties', 'figures'), exist_ok=True)
         x_range = np.linspace(0, self.property_measurements.shape[0] - 1, num=self.property_measurements.shape[0])
 
@@ -321,6 +323,8 @@ class ParameterSetDataMultiplex:
             plt.ylabel('Property Value')
             # label = f'{str(self.properties.properties[i].substance)}_{self.properties.properties[i].value}'
             plt.savefig(os.path.join('result', 'properties', 'figures', 'property_' + str(i) + '.png'), dpi=300)
+            if show is True:
+                plt.show()
             plt.clf()
 
     def calculate_ff_rmses(self):
@@ -423,18 +427,26 @@ def canonicalize_dataset(dataset):
     if not isinstance(dataset, PhysicalPropertyDataSet):
         raise TypeError('Dataset must be a PhysicalPropertyDataSet object')
     ids = []
-    for property in dataset.properties:
-        if property.id.startswith('0'):
-            property.id = property.id[1:]
+    for i,property in enumerate(dataset.properties):
+        if property.id.startswith('000'):
+            dataset.properties[i].id = property.id[3:]
+        elif property.id.startswith('00'):
+            dataset.properties[i].id = property.id[2:]
+        elif property.id.startswith('0'):
+            dataset.properties[i].id = property.id[1:]
+
+
         ids.append(int(property.id, 16))
     ids = sorted(ids)
     for i, id in enumerate(ids):
         ids[i] = format(id, 'x')
     properties = []
+    property_ids = []
     for id in ids:
         for property in dataset.properties:
             if property.id == id:
                 properties.append(property)
+                property_ids.append(id)
     dataset._properties = tuple(properties)
     return dataset
 

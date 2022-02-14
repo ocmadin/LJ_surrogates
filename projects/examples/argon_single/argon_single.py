@@ -19,7 +19,7 @@ from pyro.infer.mcmc.util import summary
 
 gc.collect()
 torch.cuda.empty_cache()
-path = '../../../data/argon-single-50-small'
+path = '../../../data/argon_single_new_20'
 smirks_types_to_change = ['[#18:1]']
 forcefield = 'openff-1-3-0-argon.offxml'
 dataset_json = 'argon_single.json'
@@ -57,18 +57,10 @@ def grid_to_surrogate_2D(grid, surrogate):
 
 
 start = time.time()
-predict, stddev = likelihood.evaluate_parameter_set(test_params_one)
-end = time.time()
-print(f'GPyTorch: {end - start} seconds')
-start = time.time()
-predict_botorch, stddev_botorch = likelihood.evaluate_parameter_set_botorch(test_params_one)
-end = time.time()
-print(f'Botorch: {end - start} seconds')
-start = time.time()
 predict_botorch_multi, stddev_botorch_multi = likelihood.evaluate_parameter_set_multisurrogate(test_params_one)
 end = time.time()
 print(f'Botorch Multi: {end - start} seconds')
-mcmc, initial_parameters = likelihood.sample(samples=5000, step_size=0.001, max_tree_depth=5, num_chains=1)
+mcmc, initial_parameters = likelihood.sample(samples=1000, step_size=0.001, max_tree_depth=5, num_chains=1)
 mcmc._samples['parameters'] = mcmc._samples['parameters'].cpu()
 summary = summary(mcmc._samples)
 params = mcmc.get_samples()['parameters'].cpu().flatten(end_dim=1).numpy()
@@ -85,74 +77,36 @@ for i in range(params.shape[1]):
 # likelihood.evaluate_surrogate_gpflow(likelihood.surrogates[0],test_params)
 os.makedirs(os.path.join('result', 'figures'), exist_ok=True)
 np.save(os.path.join('result', 'params.npy'), params)
-#plot_triangle(params, likelihood, ranges, None)
-
-gradients = compute_surrogate_gradients(dataplex.surrogates[0],dataplex.parameter_values.to_numpy()[0],0.01,device)
-grad_vs_range = []
-dist_vs_samples = []
-for i in range(len(gradients)):
-    grad_vs_range.append(abs(gradients[i].detach().cpu().numpy())/(ranges[i][1] - ranges[i][0]))
-    dist_vs_samples.append((sampled_ranges[i][1] - sampled_ranges[i][0])/(ranges[i][1] - ranges[i][0]))
+plot_triangle(params, likelihood, ranges, None, 1000)
 
 plt.clf()
-for i, surrogate in enumerate(likelihood.surrogates):
-    value_grid, uncertainty_grid = grid_to_surrogate_2D(grid, surrogate)
-    expt_value = dataplex.properties.properties[i]._value.m
-    expt_uncertainty = dataplex.properties.properties[i]._uncertainty.m
-    expt_pressure = dataplex.properties.properties[i].thermodynamic_state.pressure.m
-    expt_temperature = dataplex.properties.properties[i].thermodynamic_state.temperature.m
-    plt.contourf(grid[0], grid[1], abs(expt_value - value_grid), 20, cmap='RdGy')
-    plt.colorbar()
-    plt.xlabel('[#18:1] epsilon (kcal/mol)')
-    plt.ylabel('[#18:1] rmin_half (angstroms)')
-    plt.title(
-        f'Argon density deviation from experiment (g/ml) \n (Experimental value = {expt_value} g/ml @ {expt_temperature} K, {expt_pressure} atm)')
-    plt.savefig(os.path.join('result/figures', f'surrogate_values_{expt_temperature}_K_{expt_pressure}_atm.png'),
-                dpi=300)
-    plt.show()
 
-    plt.contourf(grid[0], grid[1], uncertainty_grid, 20, cmap='RdGy')
-    plt.colorbar()
-    plt.scatter(dataplex.parameter_values.to_numpy()[:, 0], dataplex.parameter_values.to_numpy()[:, 1], color='1',
-                marker='x')
+value_grid, uncertainty_grid = grid_to_surrogate_2D(grid, dataplex.multisurrogate)
 
-    plt.xlabel('[#18:1] epsilon (kcal/mol)')
-    plt.ylabel('[#18:1] rmin_half (angstroms)')
-    plt.title(
-        f'Argon density uncertainties (g/ml)')
-    # plt.title('Latin Hypercube Sampling of argon LJ parameters')
-    plt.savefig(os.path.join('result/figures', f'surrogate_uncertainties_{expt_temperature}_K_{expt_pressure}_atm.png'),
-                dpi=300)
-    plt.show()
+expt_value = dataplex.properties.properties[0]._value.m
+expt_uncertainty = dataplex.properties.properties[0]._uncertainty.m
+expt_pressure = dataplex.properties.properties[0].thermodynamic_state.pressure.m
+expt_temperature = dataplex.properties.properties[0].thermodynamic_state.temperature.m
+plt.contourf(grid[0], grid[1], abs(expt_value - value_grid), 20, cmap='RdGy')
+plt.colorbar()
+plt.xlabel('[#18:1] epsilon (kcal/mol)')
+plt.ylabel('[#18:1] rmin_half (angstroms)')
+plt.title(
+    f'Argon density deviation from experiment (g/ml) \n (Experimental value = {expt_value} g/ml @ {expt_temperature} K, {expt_pressure} atm)')
+plt.savefig(os.path.join('result/figures', f'surrogate_values_{expt_temperature}_K_{expt_pressure}_atm.png'),
+            dpi=300)
+plt.show()
 
-for i, surrogate in enumerate(likelihood.botorch_surrogates):
-    value_grid, uncertainty_grid = grid_to_surrogate_2D(grid, surrogate)
-    expt_value = dataplex.properties.properties[i]._value.m
-    expt_uncertainty = dataplex.properties.properties[i]._uncertainty.m
-    expt_pressure = dataplex.properties.properties[i].thermodynamic_state.pressure.m
-    expt_temperature = dataplex.properties.properties[i].thermodynamic_state.temperature.m
-    plt.contourf(grid[0], grid[1], abs(expt_value - value_grid), 20, cmap='RdGy')
-    plt.colorbar()
-    plt.scatter(dataplex.parameter_values.to_numpy()[:, 0], dataplex.parameter_values.to_numpy()[:, 1], color='1',
-                marker='x')
-    plt.xlabel('[#18:1] epsilon (kcal/mol)',fontsize=16)
-    plt.ylabel('[#18:1] rmin_half (angstroms)',fontsize=16)
-    plt.title(
-        f'Argon density deviation from experiment (g/ml)',fontsize=16)
-    plt.savefig(os.path.join('result/figures', f'surrogate_values_{expt_temperature}_K_{expt_pressure}_atm.png'),
-                dpi=300)
-    plt.show()
+plt.contourf(grid[0], grid[1], uncertainty_grid, 20, cmap='RdGy')
+plt.colorbar()
+plt.scatter(dataplex.parameter_values.to_numpy()[:, 0], dataplex.parameter_values.to_numpy()[:, 1], color='1',
+            marker='x')
 
-    plt.contourf(grid[0], grid[1], uncertainty_grid, 20, cmap='RdGy')
-    plt.colorbar()
-    plt.scatter(dataplex.parameter_values.to_numpy()[:, 0], dataplex.parameter_values.to_numpy()[:, 1], color='1',
-                marker='x')
-
-    plt.xlabel('[#18:1] epsilon (kcal/mol)',fontsize=16)
-    plt.ylabel('[#18:1] rmin_half (angstroms)',fontsize=16)
-    plt.title(
-        f'Argon density uncertainties (g/ml)',fontsize=16)
-    # plt.title('Latin Hypercube Sampling of argon LJ parameters')
-    plt.savefig(os.path.join('result/figures', f'surrogate_uncertainties_{expt_temperature}_K_{expt_pressure}_atm.png'),
-                dpi=300)
-    plt.show()
+plt.xlabel('[#18:1] epsilon (kcal/mol)')
+plt.ylabel('[#18:1] rmin_half (angstroms)')
+plt.title(
+    f'Argon density uncertainties (g/ml)')
+# plt.title('Latin Hypercube Sampling of argon LJ parameters')
+plt.savefig(os.path.join('result/figures', f'surrogate_uncertainties_{expt_temperature}_K_{expt_pressure}_atm.png'),
+            dpi=300)
+plt.show()

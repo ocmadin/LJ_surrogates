@@ -227,3 +227,26 @@ def create_forcefields_from_optimized_params(params, labels, input_forcefield):
     forcefield = ForceField(input_forcefield)
     os.makedirs(os.path.join('optimized_ffs', str(df.shape[0] + 1)), exist_ok=True)
     forcefield.to_file(os.path.join('optimized_ffs', str(df.shape[0] + 1), 'force-field.offxml'))
+
+
+def create_forcefield_for_simulation(params,labels,input_forcefield):
+    params = np.asarray(params)
+    df = pandas.DataFrame(params, columns=labels)
+    os.makedirs('optimized_ffs', exist_ok=True)
+    for i in range(df.shape[0]):
+        os.makedirs(os.path.join('optimized_ffs', str(i + 1)), exist_ok=True)
+        forcefield = ForceField(input_forcefield)
+        lj_params = forcefield.get_parameter_handler('vdW', allow_cosmetic_attributes=True)
+        for j in range(df.shape[1]):
+            smirks = df.columns[j].split('_')[0]
+            param = df.columns[j].split('_')[1]
+            for lj in lj_params:
+                if lj.smirks == smirks:
+                    if param == 'epsilon':
+                        lj.epsilon = df.values[i, j] * unit.kilocalorie_per_mole
+                    elif param == 'rmin':
+                        lj.rmin_half = df.values[i, j] * unit.angstrom
+        forcefield.to_file(os.path.join('optimized_ffs', str(i + 1), 'force-field.offxml'))
+    forcefield = ForceField(input_forcefield)
+    os.makedirs(os.path.join('optimized_ffs', str(df.shape[0] + 1)), exist_ok=True)
+    forcefield.to_file(os.path.join('optimized_ffs', str(df.shape[0] + 1), 'force-field.offxml'))

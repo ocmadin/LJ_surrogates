@@ -1,5 +1,5 @@
 from LJ_surrogates.sampling.optimize import LeastSquaresObjectiveFunction, ForceBalanceObjectiveFunction, \
-    create_forcefields_from_optimized_params
+    create_forcefields_from_optimized_params, ConstrainedGaussianObjectiveFunction
 from LJ_surrogates.surrogates.collate_data import collate_physical_property_data, calculate_ff_rmses_surrogate
 import torch
 import gc
@@ -26,13 +26,14 @@ dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefie
                                           dataset_json, device)
 
 # objective = ConstrainedGaussianObjectiveFunctionNoSurrogate(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters, 0.001)
+# objective = ConstrainedGaussianObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
+#                                           0.1)
 objective = ForceBalanceObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
                                           dataplex.property_labels)
-
 objective.flatten_parameters()
 
 initial_objective = objective.forward(objective.flat_parameters)
-jacobian = objective.forward_jac(objective.flat_parameters)
+# jacobian = objective.forward_jac(objective.flat_parameters)
 simulation_opt = np.asarray(
     [0.008766206, 1.46527, 0.080329, 1.998187, 0.0993459, 1.9809416, 0.20698197, 1.7208416, 0.16197438,
      1.7737039, 0.2106341, 1.71455])
@@ -45,7 +46,8 @@ for column in dataplex.parameter_values.columns:
     maxbound = max(dataplex.parameter_values[column].values)
     bounds.append((minbound, maxbound))
 
-bounds = [(0.002, 0.025), (1.3, 1.6), (0.07, 0.1), (1.7, 2.1), (0.08, 0.14), (1.7, 2.1), (0.18, 0.24), (1.45, 1.85), (0.15, 0.19), (1.5, 1.85), (0.18, 0.24), (1.5, 1.9)]
+# bounds = [(0.004, 0.025), (1.0, 2), (0.05, 0.2), (1.5, 3), (0.05, 0.2), (1.5, 2.5), (0.15, 0.30), (1.2, 2.0), (0.1, 0.25), (1.2, 2.5), (0.1, 0.5), (1.2, 2.5)]
+
 boundsrange = []
 for tuple in bounds:
     boundsrange.append(tuple[1]-tuple[0])
@@ -64,25 +66,25 @@ def callbackF(objective):
     print(objective)
 
 for i in range(5):
-    result_l_bfgs_b = minimize(objective,x0=objective.flat_parameters, jac=objective.forward_jac, bounds=bounds, method='L-BFGS-B')
+    # result_l_bfgs_b = minimize(objective,x0=objective.flat_parameters, jac=objective.forward_jac, bounds=bounds, method='L-BFGS-B')
     before = time.time()
     result_de = differential_evolution(objective, bounds, popsize=20, tol=0.001, recombination=0.9)
     after = time.time()
     print(f'DE Time: {after - before} seconds')
     objs.append(result_de.fun)
     params.append(result_de.x)
-    objs_lbfgsb.append(result_l_bfgs_b.fun)
-    params_lbfgsb.append(result_l_bfgs_b.x)
-    result_ncg = minimize(objective, x0=objective.flat_parameters,method='Newton-CG', jac=objective.forward_jac)
-    objs_ncg.append(result_ncg.fun)
-    params_ncg.append(result_ncg.x)
-    result_bfgs = minimize(objective,objective.flat_parameters,method='BFGS', jac=objective.forward_jac)
-    objs_bfgs.append(result_bfgs.fun)
-    params_bfgs.append(result_bfgs.x)
+    # objs_lbfgsb.append(result_l_bfgs_b.fun)
+    # params_lbfgsb.append(result_l_bfgs_b.x)
+    # result_ncg = minimize(objective, x0=objective.flat_parameters,method='Newton-CG', jac=objective.forward_jac)
+    # objs_ncg.append(result_ncg.fun)
+    # params_ncg.append(result_ncg.x)
+    # # result_bfgs = minimize(objective,objective.flat_parameters,method='BFGS', jac=objective.forward_jac)
+    # objs_bfgs.append(result_bfgs.fun)
+    # params_bfgs.append(result_bfgs.x)
 
 simulation_objective = objective.forward(simulation_opt)
 
-params_to_simulate = [simulation_opt, params[np.argmin(objs)], params_lbfgsb[np.argmin(objs_lbfgsb)], params_ncg[np.argmin(objs_ncg)]]
+params_to_simulate = [simulation_opt, params[np.argmin(objs)]]
 
 create_forcefields_from_optimized_params(params_to_simulate, objective.flat_parameter_names, 'openff-1.0.0.offxml')
 
