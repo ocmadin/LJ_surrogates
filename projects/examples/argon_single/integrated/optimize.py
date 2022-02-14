@@ -1,5 +1,8 @@
-from LJ_surrogates.sampling.integrated_optimization import IntegratedOptimizer
+from LJ_surrogates.sampling.integrated_optimization import TestOptimizer
 
-optimizer = IntegratedOptimizer('force-field.offxml','test-set-collection.json',port=8003)
+optimizer = TestOptimizer('force-field.offxml','test-set-collection.json',port=8003)
 
-optimizer.optimize()
+param_range = [[0.5, 1.5], [0.5, 1.5]]
+smirks = ['[#18:1]']
+
+optimizer.optimize(param_range=param_range,smirks=smirks)
