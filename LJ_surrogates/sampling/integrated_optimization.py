@@ -124,7 +124,7 @@ class IntegratedOptimizer:
             '-m "ls-gpu lt-gpu"'
         ]
 
-        lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
+        self.lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
                                      maximum_number_of_workers=n_workers,
                                      resources_per_worker=worker_resources,
                                      queue_name='gpuqueue',
@@ -137,63 +137,65 @@ class IntegratedOptimizer:
             f"{cpus_per_worker} CPUs and {gpus_per_worker} GPUs."
         )
 
-        self.evaluator_server = EvaluatorServer(calculation_backend=lsf_backend)
-        self.evaluator_server.start(asynchronous=True)
+        self.evaluator_server = EvaluatorServer(calculation_backend=self.lsf_backend)
 
     def submit_requests(self, folder_path, folder_list):
-        from time import sleep
-        from openff.evaluator.client import RequestResult
-        requests = {}
-        os.makedirs('estimated_results', exist_ok=True)
-        self.results_directory = 'estimated_results'
+        with self.lsf_backend:
+            with self.evaluator_server:
 
-        for subdir in os.listdir(self.force_field_directory):
-            if subdir in folder_list:
-                if os.path.exists(os.path.join(folder_path, 'test-set-collection.json') and os.path.exists(
-                        os.path.join(folder_path, 'force-field.offxml'))):
-                    forcefield = SmirnoffForceFieldSource.from_path(
-                        os.path.join(self.force_field_directory, subdir, 'force-field.offxml'))
-                    property_dataset = PhysicalPropertyDataSet.from_json(
-                        os.path.join(self.force_field_directory, subdir, 'test-set-collection.json'))
-                else:
-                    raise ValueError('Folder for request must supply test-set-collection.json and force-field.offxml')
+                from time import sleep
+                from openff.evaluator.client import RequestResult
+                requests = {}
+                os.makedirs('estimated_results', exist_ok=True)
+                self.results_directory = 'estimated_results'
 
-            if self.n_simulations > self.max_simulations:
-                raise ValueError(
-                    f"Unable to request more than {self.max_simulations} simulations.  Please increase the maximum number of simulations")
+                for subdir in os.listdir(self.force_field_directory):
+                    if subdir in folder_list:
+                        if os.path.exists(os.path.join(folder_path, 'test-set-collection.json') and os.path.exists(
+                                os.path.join(folder_path, 'force-field.offxml'))):
+                            forcefield = SmirnoffForceFieldSource.from_path(
+                                os.path.join(self.force_field_directory, subdir, 'force-field.offxml'))
+                            property_dataset = PhysicalPropertyDataSet.from_json(
+                                os.path.join(self.force_field_directory, subdir, 'test-set-collection.json'))
+                        else:
+                            raise ValueError('Folder for request must supply test-set-collection.json and force-field.offxml')
 
-            requests[subdir] = self.create_request(property_dataset, forcefield, self.port)
-            forcefield.to_force_field().to_file(
-                os.path.join('estimated_results', 'force_field_' + str(subdir) + '.offxml'))
-        while len(requests) > 0:
+                    if self.n_simulations > self.max_simulations:
+                        raise ValueError(
+                            f"Unable to request more than {self.max_simulations} simulations.  Please increase the maximum number of simulations")
 
-            has_finished = set()
+                    requests[subdir] = self.create_request(property_dataset, forcefield, self.port)
+                    forcefield.to_force_field().to_file(
+                        os.path.join('estimated_results', 'force_field_' + str(subdir) + '.offxml'))
+                while len(requests) > 0:
 
-            for subdir, request in requests.items():
+                    has_finished = set()
 
-                response, error = request.results(synchronous=False)
+                    for subdir, request in requests.items():
 
-                if (
-                        isinstance(response, RequestResult) and
-                        len(response.queued_properties) > 0
-                ):
-                    # Some properties not estimated yet.
-                    continue
+                        response, error = request.results(synchronous=False)
 
-                elif isinstance(response, RequestResult):
-                    # ALL PROPERTIES WERE SUCCESSFULLY ESTIMATED
-                    response.json(
-                        os.path.join('estimated_results', 'estimated_data_set_' + str(subdir) + '.json'))
+                        if (
+                                isinstance(response, RequestResult) and
+                                len(response.queued_properties) > 0
+                        ):
+                            # Some properties not estimated yet.
+                            continue
 
-                else:
-                    print(f"{subdir} FAILED - {error} {response}")
+                        elif isinstance(response, RequestResult):
+                            # ALL PROPERTIES WERE SUCCESSFULLY ESTIMATED
+                            response.json(
+                                os.path.join('estimated_results', 'estimated_data_set_' + str(subdir) + '.json'))
 
-                has_finished.add(subdir)
+                        else:
+                            print(f"{subdir} FAILED - {error} {response}")
 
-            for subdir in has_finished:
-                requests.pop(subdir)
+                        has_finished.add(subdir)
 
-            sleep(60)
+                    for subdir in has_finished:
+                        requests.pop(subdir)
+
+                    sleep(60)
 
     def create_request(self, property_dataset, forcefield):
 
