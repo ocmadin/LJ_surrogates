@@ -14,7 +14,9 @@ from simtk import openmm, unit
 from openff.evaluator.utils import setup_timestamp_logging
 import warnings
 import logging
-
+from openff.evaluator.backends import QueueWorkerResources
+from openff.evaluator.backends.dask import DaskLSFBackend
+from openff.evaluator.server import EvaluatorServer
 
 class IntegratedOptimizer:
     def __init__(self, input_force_field, test_set_collection, port):
@@ -23,6 +25,8 @@ class IntegratedOptimizer:
         self.n_simulations = 0
         self.max_simulations = 0
         self.port = port
+        setup_timestamp_logging()
+        self.logger = logging.getLogger()
 
     def prepare_initial_simulations(self, n_samples, smirks, absolute_bounds=None, relative_bounds=None):
         self.logger.info(
@@ -69,9 +73,7 @@ class IntegratedOptimizer:
 
     def create_server(self, n_workers=10, cpus_per_worker=1, gpus_per_worker=1, port=8001):
 
-        from openff.evaluator.backends import QueueWorkerResources
-        from openff.evaluator.backends.dask import DaskLSFBackend
-        from openff.evaluator.server import EvaluatorServer
+
 
         if n_workers <= 0:
             raise ValueError("The number of workers must be greater than 0")
@@ -91,15 +93,14 @@ class IntegratedOptimizer:
 
             # Set up logging for the evaluator.
 
-        setup_timestamp_logging()
-        self.logger = logging.getLogger()
+
 
         # Set up the directory structure.
-        working_directory = "../working_directory"
+        self.working_directory = "../working_directory"
 
         # Remove any existing data.
-        if os.path.isdir(working_directory):
-            shutil.rmtree(working_directory)
+        if os.path.isdir(self.working_directory):
+            shutil.rmtree(self.working_directory)
 
         # Set up a backend to run the calculations on with the requested resources.
         if gpus_per_worker <= 0:
@@ -137,11 +138,14 @@ class IntegratedOptimizer:
             f"{cpus_per_worker} CPUs and {gpus_per_worker} GPUs."
         )
 
-        self.evaluator_server = EvaluatorServer(calculation_backend=self.lsf_backend)
 
     def submit_requests(self, folder_path, folder_list):
         with self.lsf_backend:
-            with self.evaluator_server:
+            with EvaluatorServer(calculation_backend=self.lsf_backend,
+                             working_directory=self.working_directory,
+                             port=self.port,
+                             enable_data_caching=False,
+                             delete_working_files=True):
 
                 from time import sleep
                 from openff.evaluator.client import RequestResult
