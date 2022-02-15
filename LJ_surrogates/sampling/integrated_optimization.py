@@ -18,6 +18,7 @@ from openff.evaluator.backends import QueueWorkerResources
 from openff.evaluator.backends.dask import DaskLSFBackend
 from openff.evaluator.server import EvaluatorServer
 
+
 class IntegratedOptimizer:
     def __init__(self, input_force_field, test_set_collection, port):
         self.force_field_source = input_force_field
@@ -65,9 +66,9 @@ class IntegratedOptimizer:
             for lj in lj_params:
                 if lj.smirks == smirks:
                     if param == 'epsilon':
-                        lj.epsilon = df.values[0,j] * unit.kilocalorie_per_mole
+                        lj.epsilon = df.values[0, j] * unit.kilocalorie_per_mole
                     elif param == 'rmin':
-                        lj.rmin_half = df.values[0,j] * unit.angstrom
+                        lj.rmin_half = df.values[0, j] * unit.angstrom
         forcefield.to_file(os.path.join(self.force_field_directory, str(self.n_simulations + 1), 'force-field.offxml'))
         shutil.copy2('test-set-collection.json', os.path.join(self.force_field_directory, str(self.n_simulations + 1)))
 
@@ -90,8 +91,6 @@ class IntegratedOptimizer:
             raise ValueError("The port number must be greater than or equal to 8000")
 
             # Set up logging for the evaluator.
-
-
 
         # Set up the directory structure.
         self.working_directory = "../working_directory"
@@ -124,11 +123,11 @@ class IntegratedOptimizer:
         ]
 
         self.lsf_backend = DaskLSFBackend(minimum_number_of_workers=1,
-                                     maximum_number_of_workers=n_workers,
-                                     resources_per_worker=worker_resources,
-                                     queue_name='gpuqueue',
-                                     setup_script_commands=setup_script_commands,
-                                     extra_script_options=extra_script_options)
+                                          maximum_number_of_workers=n_workers,
+                                          resources_per_worker=worker_resources,
+                                          queue_name='gpuqueue',
+                                          setup_script_commands=setup_script_commands,
+                                          extra_script_options=extra_script_options)
 
         # Create an estimation server which will run the calculations.
         self.logger.info(
@@ -136,13 +135,12 @@ class IntegratedOptimizer:
             f"{cpus_per_worker} CPUs and {gpus_per_worker} GPUs."
         )
 
-
     def submit_requests(self, folder_path, folder_list):
         with EvaluatorServer(calculation_backend=self.lsf_backend,
-                         working_directory=self.working_directory,
-                         port=self.port,
-                         enable_data_caching=False,
-                         delete_working_files=True):
+                             working_directory=self.working_directory,
+                             port=self.port,
+                             enable_data_caching=False,
+                             delete_working_files=True):
 
             from time import sleep
             from openff.evaluator.client import RequestResult
@@ -159,7 +157,8 @@ class IntegratedOptimizer:
                         property_dataset = PhysicalPropertyDataSet.from_json(
                             os.path.join(self.force_field_directory, subdir, 'test-set-collection.json'))
                     else:
-                        raise ValueError('Folder for request must supply test-set-collection.json and force-field.offxml')
+                        raise ValueError(
+                            'Folder for request must supply test-set-collection.json and force-field.offxml')
 
                 if self.n_simulations > self.max_simulations:
                     raise ValueError(
@@ -197,7 +196,6 @@ class IntegratedOptimizer:
                     requests.pop(subdir)
 
                 sleep(60)
-
 
     def create_request(self, property_dataset, forcefield):
 
@@ -262,15 +260,16 @@ class TestOptimizer(IntegratedOptimizer):
 
             self.submit_requests(folder_path=self.force_field_directory, folder_list=folder_list)
 
-            self.build_physical_property_surrogate()
-
-            self.objective = ConstrainedGaussianObjectiveFunction(self.dataplex.multisurrogate, self.dataplex.properties,
-                                                                  self.dataplex.initial_parameters, 0.01)
-            self.objective.flatten_parameters()
             iter = 0
             objectives = []
             params = []
             while self.n_simulations <= self.max_simulations:
+                self.build_physical_property_surrogate()
+
+                self.objective = ConstrainedGaussianObjectiveFunction(self.dataplex.multisurrogate,
+                                                                      self.dataplex.properties,
+                                                                      self.dataplex.initial_parameters, 0.01)
+                self.objective.flatten_parameters()
                 self.logger.info(
                     f'Optimization Iteration {iter}: optimizing over a surrogate built from {self.n_simulations} datasets')
                 bounds = []
@@ -285,7 +284,7 @@ class TestOptimizer(IntegratedOptimizer):
                 objectives.append(result.fun)
                 params.append(result.x)
                 iter += 1
-
-                self.prepare_single_simulation(params=[result.x], labels = self.dataplex.parameter_labels)
+                self.prepare_single_simulation(params=[result.x], labels=self.dataplex.parameter_labels)
                 self.submit_requests(folder_path=self.force_field_directory, folder_list=[str(self.n_simulations + 1)])
-            self.evaluator_server.stop()
+            self.logger.info(
+                f'Optimization complete after {iter} iterations: Objective function value of {result.fun} and parameters of {result.x}')
