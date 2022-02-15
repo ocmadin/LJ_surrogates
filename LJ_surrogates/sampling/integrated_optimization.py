@@ -249,12 +249,12 @@ class TestOptimizer(IntegratedOptimizer):
         from LJ_surrogates.sampling.optimize import ConstrainedGaussianObjectiveFunction
         from scipy.optimize import differential_evolution
 
-        self.max_simulations = 15
+        self.max_simulations = 10
 
         self.create_server(n_workers=10, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
         self.param_range = param_range
         self.smirks = ['[#18:1]']
-        n_samples = 10
+        n_samples = 5
 
         self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range)
 
@@ -266,6 +266,7 @@ class TestOptimizer(IntegratedOptimizer):
 
         self.objective = ConstrainedGaussianObjectiveFunction(self.dataplex.multisurrogate, self.dataplex.properties,
                                                               self.dataplex.initial_parameters, 0.01)
+        self.objective.flatten_parameters()
         iter = 0
         objectives = []
         params = []
@@ -285,6 +286,6 @@ class TestOptimizer(IntegratedOptimizer):
             params.append(result.x)
             iter += 1
 
-            self.prepare_single_simulation(params=result.x, labels = self.dataplex.parameter_labels)
+            self.prepare_single_simulation(params=[result.x], labels = self.dataplex.parameter_labels)
             self.submit_requests(folder_path=self.force_field_directory, folder_list=[str(self.n_simulations + 1)])
         self.evaluator_server.stop()
