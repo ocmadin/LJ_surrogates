@@ -168,7 +168,7 @@ class IntegratedOptimizer:
                         raise ValueError(
                             f"Unable to request more than {self.max_simulations} simulations.  Please increase the maximum number of simulations")
 
-                    requests[subdir] = self.create_request(property_dataset, forcefield, self.port)
+                    requests[subdir] = self.create_request(property_dataset, forcefield)
                     forcefield.to_force_field().to_file(
                         os.path.join('estimated_results', 'force_field_' + str(subdir) + '.offxml'))
                 while len(requests) > 0:
@@ -251,7 +251,7 @@ class TestOptimizer(IntegratedOptimizer):
 
         self.max_simulations = 15
 
-        self.create_server(n_workers=10, cpus_per_worker=1, gpus_per_worker=1, port=8004)
+        self.create_server(n_workers=10, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
         self.param_range = param_range
         self.smirks = ['[#18:1]']
         n_samples = 10
