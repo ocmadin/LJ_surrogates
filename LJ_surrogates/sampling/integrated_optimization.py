@@ -68,12 +68,10 @@ class IntegratedOptimizer:
                         lj.epsilon = df.values[0,j] * unit.kilocalorie_per_mole
                     elif param == 'rmin':
                         lj.rmin_half = df.values[0,j] * unit.angstrom
-        forcefield.to_file(os.path.join('optimized_ffs', str(self.n_simulations + 1), 'force-field.offxml'))
+        forcefield.to_file(os.path.join(self.force_field_directory, str(self.n_simulations + 1), 'force-field.offxml'))
         shutil.copy2('test-set-collection.json', os.path.join(self.force_field_directory, str(self.n_simulations + 1)))
 
-    def setup_server(self, n_workers=10, cpus_per_worker=1, gpus_per_worker=1, port=8001):
-
-
+    def create_server(self, n_workers=5, cpus_per_worker=1, gpus_per_worker=1, port=8001):
 
         if n_workers <= 0:
             raise ValueError("The number of workers must be greater than 0")
@@ -199,6 +197,7 @@ class IntegratedOptimizer:
                     requests.pop(subdir)
 
                 sleep(60)
+
 
     def create_request(self, property_dataset, forcefield):
 
