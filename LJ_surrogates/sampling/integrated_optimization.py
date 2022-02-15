@@ -160,13 +160,13 @@ class IntegratedOptimizer:
                         raise ValueError(
                             'Folder for request must supply test-set-collection.json and force-field.offxml')
 
-                if self.n_simulations > self.max_simulations:
-                    raise ValueError(
-                        f"Unable to request more than {self.max_simulations} simulations.  Please increase the maximum number of simulations")
+                    if self.n_simulations > self.max_simulations:
+                        raise ValueError(
+                            f"Unable to request more than {self.max_simulations} simulations.  Please increase the maximum number of simulations")
 
-                requests[subdir] = self.create_request(property_dataset, forcefield)
-                forcefield.to_force_field().to_file(
-                    os.path.join('estimated_results', 'force_field_' + str(subdir) + '.offxml'))
+                    requests[subdir] = self.create_request(property_dataset, forcefield)
+                    forcefield.to_force_field().to_file(
+                        os.path.join('estimated_results', 'force_field_' + str(subdir) + '.offxml'))
             while len(requests) > 0:
 
                 has_finished = set()
