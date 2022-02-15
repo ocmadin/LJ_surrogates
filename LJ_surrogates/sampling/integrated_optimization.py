@@ -257,7 +257,7 @@ class TestOptimizer(IntegratedOptimizer):
 
             self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range)
 
-            folder_list = [str(i) for i in range(n_samples)]
+            folder_list = [str(i+1) for i in range(n_samples)]
 
             self.submit_requests(folder_path=self.force_field_directory, folder_list=folder_list)
 
