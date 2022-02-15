@@ -214,19 +214,18 @@ class IntegratedOptimizer:
 
         connection_options = ConnectionOptions(server_address="localhost", server_port=self.port)
         evaluator_client = EvaluatorClient(connection_options)
+        self.n_simulations += 1
 
         request, _ = evaluator_client.request_estimate(
             property_set=property_dataset,
             force_field_source=forcefield,
             options=estimation_options,
         )
-        self.n_simulations += 1
+
         self.logger.info(
             f"Requesting a simulation of {len(property_dataset.properties)} physical properties."
             f"This is simulation #{self.n_simulations}/{self.max_simulations}"
         )
-
-        return request
 
     def build_physical_property_surrogate(self):
         from LJ_surrogates.surrogates.collate_data import collate_physical_property_data
@@ -285,7 +284,10 @@ class TestOptimizer(IntegratedOptimizer):
                 objectives.append(result.fun)
                 params.append(result.x)
                 iter += 1
-                self.prepare_single_simulation(params=[result.x], labels=self.dataplex.parameter_labels)
-                self.submit_requests(folder_path=self.force_field_directory, folder_list=[str(self.n_simulations + 1)])
+                if self.n_simulations < self.max_simulations:
+                    self.prepare_single_simulation(params=[result.x], labels=self.dataplex.parameter_labels)
+                    self.submit_requests(folder_path=self.force_field_directory, folder_list=[str(self.n_simulations + 1)])
+                else:
+                    break
         self.logger.info(
             f'Optimization complete after {iter} iterations: Objective function value of {result.fun} and parameters of {result.x}')
