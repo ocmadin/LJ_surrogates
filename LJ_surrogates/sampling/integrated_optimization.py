@@ -165,7 +165,7 @@ class IntegratedOptimizer:
                             f"Unable to request more than {self.max_simulations} simulations.  Please increase the maximum number of simulations")
 
                     requests[subdir] = self.create_request(property_dataset, forcefield)
-                    forcefield.to_force_field().to_file(
+                    forcefield.to_file(
                         os.path.join('estimated_results', 'force_field_' + str(subdir) + '.offxml'))
 
             while len(requests) > 0:
