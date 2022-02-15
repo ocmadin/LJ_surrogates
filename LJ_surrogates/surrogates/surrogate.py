@@ -4,7 +4,6 @@ import numpy
 import numpy as np
 import gpytorch
 import torch
-import gpflow
 import matplotlib.pyplot as plt
 import pandas
 import copy
