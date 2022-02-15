@@ -6,7 +6,7 @@ import pandas
 import numpy as np
 import os
 from LJ_surrogates.parameter_modification import vary_parameters_lhc
-from openff.evaluator.forcefield import SmirnoffForceFieldSource
+from openff.toolkit.typing.engines.smirnoff.forcefield import ForceField
 from openff.evaluator.properties import Density, EnthalpyOfMixing
 from openff.evaluator.client import RequestOptions
 from openff.evaluator.client import EvaluatorClient, ConnectionOptions
@@ -57,7 +57,7 @@ class IntegratedOptimizer:
         params = np.asarray(params)
         df = pandas.DataFrame(params, columns=labels)
         os.makedirs(os.path.join(self.force_field_directory, str(self.n_simulations + 1)))
-        forcefield = SmirnoffForceFieldSource(self.force_field_source)
+        forcefield = ForceField(self.force_field_source)
         lj_params = forcefield.get_parameter_handler('vdW', allow_cosmetic_attributes=True)
         for j in range(df.shape[1]):
             smirks = df.columns[j].split('_')[0]
@@ -157,7 +157,7 @@ class IntegratedOptimizer:
                     if subdir in folder_list:
                         if os.path.exists(os.path.join(folder_path, 'test-set-collection.json') and os.path.exists(
                                 os.path.join(folder_path, 'force-field.offxml'))):
-                            forcefield = SmirnoffForceFieldSource.from_path(
+                            forcefield = ForceField.from_path(
                                 os.path.join(self.force_field_directory, subdir, 'force-field.offxml'))
                             property_dataset = PhysicalPropertyDataSet.from_json(
                                 os.path.join(self.force_field_directory, subdir, 'test-set-collection.json'))
