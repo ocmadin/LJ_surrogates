@@ -71,7 +71,7 @@ class IntegratedOptimizer:
         forcefield.to_file(os.path.join(self.force_field_directory, str(self.n_simulations + 1), 'force-field.offxml'))
         shutil.copy2('test-set-collection.json', os.path.join(self.force_field_directory, str(self.n_simulations + 1)))
 
-    def create_server(self, n_workers=5, cpus_per_worker=1, gpus_per_worker=1, port=8001):
+    def setup_server(self, n_workers=5, cpus_per_worker=1, gpus_per_worker=1, port=8001):
 
         if n_workers <= 0:
             raise ValueError("The number of workers must be greater than 0")
@@ -154,7 +154,7 @@ class IntegratedOptimizer:
                 if subdir in folder_list:
                     if os.path.exists(os.path.join(folder_path, 'test-set-collection.json') and os.path.exists(
                             os.path.join(folder_path, 'force-field.offxml'))):
-                        forcefield = ForceField.from_path(
+                        forcefield = ForceField(
                             os.path.join(self.force_field_directory, subdir, 'force-field.offxml'))
                         property_dataset = PhysicalPropertyDataSet.from_json(
                             os.path.join(self.force_field_directory, subdir, 'test-set-collection.json'))
@@ -166,7 +166,7 @@ class IntegratedOptimizer:
                         f"Unable to request more than {self.max_simulations} simulations.  Please increase the maximum number of simulations")
 
                 requests[subdir] = self.create_request(property_dataset, forcefield)
-                forcefield.to_force_field().to_file(
+                forcefield.to_file(
                     os.path.join('estimated_results', 'force_field_' + str(subdir) + '.offxml'))
             while len(requests) > 0:
 
@@ -288,4 +288,3 @@ class TestOptimizer(IntegratedOptimizer):
 
                 self.prepare_single_simulation(params=[result.x], labels = self.dataplex.parameter_labels)
                 self.submit_requests(folder_path=self.force_field_directory, folder_list=[str(self.n_simulations + 1)])
-            self.evaluator_server.stop()
