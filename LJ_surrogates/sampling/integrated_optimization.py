@@ -226,7 +226,7 @@ class IntegratedOptimizer:
         self.n_simulations += 1
         self.logger.info(
             f"Requesting a simulation of {len(property_dataset.properties)} physical properties."
-            f"This is simulation #{self.n_simulations} of the {self.max_simulations}"
+            f"This is simulation #{self.n_simulations}/{self.max_simulations}"
         )
 
         return request

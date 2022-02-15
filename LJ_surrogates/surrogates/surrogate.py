@@ -4,7 +4,6 @@ import numpy
 import numpy as np
 import gpytorch
 import torch
-import gpflow
 import matplotlib.pyplot as plt
 import pandas
 import copy
@@ -208,24 +207,24 @@ def build_surrogate_lightweight_botorch(parameter_data, property_data, property_
     return model
 
 def build_multisurrogate_lightweight_botorch(parameter_data, property_data, property_uncertainties, device):
-    cuda = torch.device('cuda')
-    X = torch.tensor(parameter_data).to(device=cuda)
-    Y = torch.tensor(property_data).T.to(device=cuda)
-    Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
+    # cuda = torch.device('cuda')
+    # X = torch.tensor(parameter_data).to(device=cuda)
+    # Y = torch.tensor(property_data).T.to(device=cuda)
+    # Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
+    X = torch.tensor(parameter_data)
+    Y = torch.tensor(property_data).T
+    Y_err = torch.tensor(property_uncertainties).T
 
     covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
 
-    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err)).cuda()
+    likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
     from botorch.models import FixedNoiseGP
     from botorch.fit import fit_gpytorch_model
-    model = FixedNoiseGP(X, Y, Y_err, covar_module=covar_module).cuda()
+    model = FixedNoiseGP(X, Y, Y_err, covar_module=covar_module)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
     model.eval()
     model.likelihood.eval()
-    if device == 'cpu':
-        model.cpu()
-        likelihood.cpu()
     return model
 
 def build_multisurrogate_lightweight(parameter_data, property_data, property_uncertainties, device):
