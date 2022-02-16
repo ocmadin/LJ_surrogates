@@ -175,6 +175,21 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
         objective_jacobian = obj_density_jacobian + obj_hvap_jacobian
         return objective_jacobian.detach().numpy()
 
+    def simulation_objective(self, simulation_outputs):
+        simulation_hvap = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
+        simulation_density = torch.tensor(simulation_outputs[self.density_labels]).unsqueeze(-1)
+
+        density_objective = (1 / simulation_density.shape[0]) * torch.sum(torch.square(
+            (self.density_measurements - simulation_density) / self.density_denominator))
+        hvap_objective = (1 / simulation_hvap.shape[0]) * torch.sum(torch.square(
+            (self.hvap_measurements - simulation_hvap) / self.hvap_denominator))
+
+        objective = density_objective + hvap_objective
+        return objective.item()
+
+
+
+
 class Optimizer:
     def __init__(self, objective_function):
         self.objective_function = objective_function

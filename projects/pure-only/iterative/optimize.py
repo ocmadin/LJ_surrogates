@@ -96,3 +96,10 @@ results = []
 rmses = []
 for i in range(all_to_simulate.shape[1]):
     results.append(objective.forward(all_to_simulate[i]))
+
+
+a = objective.simulation_objective(dataplex.property_measurements.values[1])
+b = objective.forward(dataplex.parameter_values.values[1])
+c = dataplex.property_measurements.values[1]
+d = objective.evaluate_parameter_set_multisurrogate(torch.tensor(dataplex.parameter_values.values[1]).unsqueeze(-1).T)[0].detach().numpy().squeeze()
+diff = d-c

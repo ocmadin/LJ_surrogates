@@ -17,6 +17,7 @@ import logging
 from openff.evaluator.backends import QueueWorkerResources
 from openff.evaluator.backends.dask import DaskLSFBackend
 from openff.evaluator.server import EvaluatorServer
+import copy
 
 
 class IntegratedOptimizer:
@@ -29,10 +30,16 @@ class IntegratedOptimizer:
         setup_timestamp_logging()
         self.logger = logging.getLogger()
 
-    def prepare_initial_simulations(self, n_samples, smirks, absolute_bounds=None, relative_bounds=None):
-        self.logger.info(
-            f"Creating a set of {n_samples} force fields for simulation"
-        )
+    def prepare_initial_simulations(self, n_samples, smirks, absolute_bounds=None, relative_bounds=None,
+                                    include_initial_ff=False):
+        if include_initial_ff is True:
+            self.logger.info(
+                f"Creating a set of {n_samples + 1} force fields for simulation"
+            )
+        else:
+            self.logger.info(
+                f"Creating a set of {n_samples} force fields for simulation"
+            )
         if relative_bounds is not None:
             if isinstance(relative_bounds, list):
                 bounds = relative_bounds
@@ -53,6 +60,10 @@ class IntegratedOptimizer:
 
         for folder in os.listdir(self.force_field_directory):
             shutil.copy2('test-set-collection.json', os.path.join(self.force_field_directory, folder))
+        if include_initial_ff is True:
+            os.makedirs(os.path.join(self.force_field_directory, str(n_samples + 1)))
+            shutil.copy2('test-set-collection.json', os.path.join(self.force_field_directory, str(n_samples + 1)))
+            shutil.copy2(self.force_field_source, os.path.join(self.force_field_directory, str(n_samples + 1)))
 
     def prepare_single_simulation(self, params, labels):
         params = np.asarray(params)
@@ -286,8 +297,120 @@ class TestOptimizer(IntegratedOptimizer):
                 iter += 1
                 if self.n_simulations < self.max_simulations:
                     self.prepare_single_simulation(params=[result.x], labels=self.dataplex.parameter_labels)
-                    self.submit_requests(folder_path=self.force_field_directory, folder_list=[str(self.n_simulations + 1)])
+                    self.submit_requests(folder_path=self.force_field_directory,
+                                         folder_list=[str(self.n_simulations + 1)])
                 else:
                     break
         self.logger.info(
             f'Optimization complete after {iter} iterations: Objective function value of {result.fun} and parameters of {result.x}')
+
+
+class SurrogateSearchOptimizer(IntegratedOptimizer):
+
+    def optimize(self, param_range, smirks):
+        from LJ_surrogates.sampling.optimize import ForceBalanceObjectiveFunction
+        from scipy.optimize import differential_evolution
+
+        self.max_simulations = 25
+        self.eta_1 = 0.01
+        self.eta_2 = 0.5
+        self.bounds_increment = 1.1
+        self.setup_server(n_workers=10, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
+        with self.lsf_backend:
+
+            self.param_range = param_range
+            self.smirks = smirks
+            n_samples = 10
+
+            self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range,
+                                             include_initial_ff=True)
+
+            folder_list = [str(i + 1) for i in range(n_samples + 1)]
+
+            self.submit_requests(folder_path=self.force_field_directory, folder_list=folder_list)
+
+            iter = 0
+            objectives = []
+            params = []
+            while self.n_simulations <= self.max_simulations:
+                self.build_physical_property_surrogate()
+
+                self.objective = ForceBalanceObjectiveFunction(self.dataplex.multisurrogate,
+                                                               self.dataplex.properties,
+                                                               self.dataplex.initial_parameters,
+                                                               self.dataplex.property_labels)
+                self.objective.flatten_parameters()
+
+                if iter == 0:
+                    self.solution = copy.deepcopy(self.dataplex.initial_parameters)
+                    for i in range(self.dataplex.parameter_values.shape[0]):
+                        if self.dataplex.parameter_values.values[i] == self.solution:
+                            self.solution_objective = self.objective.simulation_objective(
+                                self.dataplex.property_measurements.values[i])
+
+                            break
+                self.bounds = []
+                for column in self.dataplex.parameter_values.columns:
+                    minbound = min(self.dataplex.parameter_values[column].values)
+                    maxbound = max(self.dataplex.parameter_values[column].values)
+                    self.bounds.append((minbound, maxbound))
+                    self.logger.info(
+                        f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
+
+                self.logger.info(
+                    f'Optimization Iteration {iter}: optimizing over a surrogate built from {self.n_simulations} datasets')
+
+                surrogate_result = differential_evolution(self.objective, self.bounds)
+                self.logger.info(
+                    f'Surrogate proposes solution with surrogate objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
+                predicted_reduction = self.solution_objective - surrogate_result.fun
+
+                if surrogate_result >= self.solution_objective:
+                    self.logger.info(
+                        f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
+                    self.logger.info(
+                        f'Proposed solution discarded and search space increased')
+                    self.bounds *= self.bounds_increment
+                else:
+                    self.logger.info(
+                        f'Surrogate proposed solution has objective {surrogate_result.fun}, < current simulation objective {self.solution_objective}')
+                    if self.n_simulations < self.max_simulations:
+                        self.logger.info(
+                            f'Simulating set of parameters from surrogate solution')
+                        self.prepare_single_simulation(params=[surrogate_result.x],
+                                                       labels=self.dataplex.parameter_labels)
+                        self.submit_requests(folder_path=self.force_field_directory,
+                                             folder_list=[str(self.n_simulations + 1)])
+                        self.build_physical_property_surrogate()
+                        for i in range(self.dataplex.parameter_values.shape[0]):
+                            if self.dataplex.parameter_values.values[i] == surrogate_result.x:
+                                simulation_objective = self.objective.simulation_objective(
+                                    self.dataplex.property_measurements.values[i])
+                                break
+                        self.logger.info(
+                            f'Surrogate proposed solution has simulation objective {simulation_objective}')
+                        actual_reduction = self.solution_objective - simulation_objective
+                        reduction_ratio = actual_reduction / predicted_reduction
+                        if reduction_ratio <= 0:
+                            self.logger.info(
+                                f'Improvement predicted but not achieved.  Rejecting proposed solution.')
+                        elif 0 < reduction_ratio <= self.eta_1:
+                            self.solution = surrogate_result.x
+                            self.solution_objective = simulation_objective
+                            self.logger.info(
+                                f'Much less improvement achieved than predicted.  Accepting proposed solution with objective {simulation_objective}')
+                        elif self.eta_1 < reduction_ratio <= self.eta_2:
+                            self.solution = surrogate_result.x
+                            self.solution_objective = simulation_objective
+                            self.logger.info(
+                                f'Satisfactory prediction.  Accepting proposed solution with objective {simulation_objective}')
+                        else:
+                            self.solution = surrogate_result.x
+                            self.solution_objective = simulation_objective
+                            self.logger.info(
+                                f'Excellent prediction.  Accepting proposed solution with objective {simulation_objective}')
+                        iter += 1
+                    else:
+                        break
+        self.logger.info(
+            f'Optimization complete after {iter} iterations: Objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
