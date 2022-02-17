@@ -192,7 +192,7 @@ class ParameterSetDataMultiplex:
         self.parameter_values = pandas.DataFrame(all_parameters, columns=parameter_labels)
         if len(bad_density_parameters) > 0:
             self.bad_density_param_values = pandas.DataFrame(bad_density_parameters, columns=parameter_labels)
-        # self.plot_parameter_sets()
+        self.plot_parameter_sets()
         self.property_measurements = pandas.DataFrame(property_measurements, columns=property_labels)
         self.property_uncertainties = pandas.DataFrame(property_uncertainties, columns=property_labels)
 
@@ -233,7 +233,6 @@ class ParameterSetDataMultiplex:
             num_surrogates = self.property_measurements.shape[1]
         surrogate_measurements = self.property_measurements.values.transpose()
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
-        self.parameter_values = self.parameter_values.iloc[:, :-1]
         self.multisurrogate = build_multisurrogate_lightweight_botorch(self.parameter_values.values,
                                                                        surrogate_measurements,
                                                                        surrogate_uncertainties, self.device)
@@ -267,7 +266,7 @@ class ParameterSetDataMultiplex:
 
     def plot_parameter_sets(self, show=False):
         all_params = []
-        df_1 = self.parameter_values
+        df_1 = copy.deepcopy(self.parameter_values)
         import textwrap
         import seaborn
         wrapper = textwrap.TextWrapper(width=25)
