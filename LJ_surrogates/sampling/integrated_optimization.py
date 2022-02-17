@@ -63,7 +63,7 @@ class IntegratedOptimizer:
         if include_initial_ff is True:
             os.makedirs(os.path.join(self.force_field_directory, str(n_samples + 1)))
             shutil.copy2('test-set-collection.json', os.path.join(self.force_field_directory, str(n_samples + 1)))
-            shutil.copy2(self.force_field_source, os.path.join(self.force_field_directory, str(n_samples + 1)))
+            shutil.copy2(self.force_field_source, os.path.join(self.force_field_directory, str(n_samples + 1),'force-field.offxml'))
 
     def prepare_single_simulation(self, params, labels):
         params = np.asarray(params)
@@ -71,7 +71,7 @@ class IntegratedOptimizer:
         os.makedirs(os.path.join(self.force_field_directory, str(self.n_simulations + 1)))
         forcefield = ForceField(self.force_field_source)
         lj_params = forcefield.get_parameter_handler('vdW', allow_cosmetic_attributes=True)
-        for j in range(df.shape[0]):
+        for j in range(df.shape[1]):
             smirks = df.columns[j].split('_')[0]
             param = df.columns[j].split('_')[1]
             for lj in lj_params:
@@ -306,11 +306,11 @@ class TestOptimizer(IntegratedOptimizer):
 
 class SurrogateSearchOptimizer(IntegratedOptimizer):
 
-    def optimize(self, param_range, smirks):
+    def optimize(self, param_range, smirks, max_simulations, initial_samples):
         from LJ_surrogates.sampling.optimize import ForceBalanceObjectiveFunction
         from scipy.optimize import differential_evolution
 
-        self.max_simulations = 25
+        self.max_simulations = max_simulations
         self.eta_1 = 0.01
         self.eta_2 = 0.5
         self.bounds_increment = 1.1
@@ -319,7 +319,7 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
 
             self.param_range = param_range
             self.smirks = smirks
-            n_samples = 10
+            n_samples = initial_samples
 
             self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range,
                                              include_initial_ff=True)
@@ -341,9 +341,12 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
                 self.objective.flatten_parameters()
 
                 if iter == 0:
-                    self.solution = copy.deepcopy(self.dataplex.initial_parameters)
+                    self.solution = copy.deepcopy(self.objective.flat_parameters)
                     for i in range(self.dataplex.parameter_values.shape[0]):
-                        if self.dataplex.parameter_values.values[i] == self.solution:
+                        print(self.dataplex.parameter_values.values[i])
+                        if np.allclose(self.dataplex.parameter_values.values[i], self.solution):
+                            self.logger.info(
+                                f'Computing simulation objective for parameter set {self.solution}')
                             self.solution_objective = self.objective.simulation_objective(
                                 self.dataplex.property_measurements.values[i])
 
@@ -353,8 +356,8 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
                     minbound = min(self.dataplex.parameter_values[column].values)
                     maxbound = max(self.dataplex.parameter_values[column].values)
                     self.bounds.append((minbound, maxbound))
-                    self.logger.info(
-                        f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
+                self.logger.info(
+                    f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
 
                 self.logger.info(
                     f'Optimization Iteration {iter}: optimizing over a surrogate built from {self.n_simulations} datasets')
@@ -364,7 +367,7 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
                     f'Surrogate proposes solution with surrogate objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
                 predicted_reduction = self.solution_objective - surrogate_result.fun
 
-                if surrogate_result >= self.solution_objective:
+                if surrogate_result.fun >= self.solution_objective:
                     self.logger.info(
                         f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
                     self.logger.info(
@@ -382,9 +385,11 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
                                              folder_list=[str(self.n_simulations + 1)])
                         self.build_physical_property_surrogate()
                         for i in range(self.dataplex.parameter_values.shape[0]):
-                            if self.dataplex.parameter_values.values[i] == surrogate_result.x:
+                            if np.allclose(self.dataplex.parameter_values.values[i], surrogate_result.x):
                                 simulation_objective = self.objective.simulation_objective(
                                     self.dataplex.property_measurements.values[i])
+                                self.logger.info(
+                                    f'Computing simulation objective for parameter set {surrogate_result.x}')
                                 break
                         self.logger.info(
                             f'Surrogate proposed solution has simulation objective {simulation_objective}')

@@ -192,7 +192,7 @@ class ParameterSetDataMultiplex:
         self.parameter_values = pandas.DataFrame(all_parameters, columns=parameter_labels)
         if len(bad_density_parameters) > 0:
             self.bad_density_param_values = pandas.DataFrame(bad_density_parameters, columns=parameter_labels)
-        self.plot_parameter_sets()
+        # self.plot_parameter_sets()
         self.property_measurements = pandas.DataFrame(property_measurements, columns=property_labels)
         self.property_uncertainties = pandas.DataFrame(property_uncertainties, columns=property_labels)
 
@@ -386,8 +386,8 @@ def get_training_data_new(data, properties, parameters, device):
     after = len(dataplex.multi_data)
     print(f'Removed {before - after} incomplete or errored datasets')
     dataplex.align_property_data()
-    dataplex.plot_parameter_sets()
-    dataplex.plot_properties()
+    # dataplex.plot_parameter_sets()
+    # dataplex.plot_properties()
     print(f'Proceeding to build surrogates with {len(dataplex.multi_data)} Datasets')
     # dataplex.property_measurements.drop(columns=['CC(=O)O{solv}{x=1.000000}_EnthalpyOfVaporization','CC(=O)O{solv}{x=1.000000}_Density'],inplace=True)
     # dataplex.property_uncertainties.drop(

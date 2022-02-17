@@ -6,5 +6,8 @@ param_range = [[0.5, 1.5], [0.95, 1.05], [0.9, 2.0], [0.95, 1.05], [0.5, 1.5], [
                [0.75, 1.25], [0.95, 1.05]]
 smirks = ['[#1:1]-[#6X4]', '[#1:1]-[#6X4]-[#7,#8,#9,#16,#17,#35]', '[#1:1]-[#8]', '[#6X4:1]',
           '[#8X2H1+0:1]']
+max_simulations = 10
 
-optimizer.optimize(param_range=param_range,smirks=smirks)
+initial_samples = 4
+
+optimizer.optimize(param_range=param_range,smirks=smirks, max_simulations=max_simulations, initial_samples=initial_samples)
