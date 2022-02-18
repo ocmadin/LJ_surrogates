@@ -192,7 +192,7 @@ class ParameterSetDataMultiplex:
         self.parameter_values = pandas.DataFrame(all_parameters, columns=parameter_labels)
         if len(bad_density_parameters) > 0:
             self.bad_density_param_values = pandas.DataFrame(bad_density_parameters, columns=parameter_labels)
-        self.plot_parameter_sets()
+        # self.plot_parameter_sets()
         self.property_measurements = pandas.DataFrame(property_measurements, columns=property_labels)
         self.property_uncertainties = pandas.DataFrame(property_uncertainties, columns=property_labels)
 

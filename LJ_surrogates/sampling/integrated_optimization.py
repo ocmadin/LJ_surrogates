@@ -332,7 +332,8 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
             objectives = []
             params = []
             while self.n_simulations <= self.max_simulations:
-                self.build_physical_property_surrogate()
+                if iter == 0:
+                    self.build_physical_property_surrogate()
 
                 self.objective = ForceBalanceObjectiveFunction(self.dataplex.multisurrogate,
                                                                self.dataplex.properties,
@@ -417,4 +418,4 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
                     else:
                         break
         self.logger.info(
-            f'Optimization complete after {iter} iterations: Objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
+            f'Optimization complete after {iter} iterations: Objective function value of {self.solution_objective} and parameters of {self.solution}')
