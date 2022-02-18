@@ -187,7 +187,18 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
         objective = density_objective + hvap_objective
         return objective.item()
 
+    def surrogate_avg_uncertainty(self, parameters):
+        surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
+            torch.tensor(parameters).unsqueeze(-1).T)
+        surrogates_hvap = surrogate_predictions[self.hvap_labels]
+        surrogates_density = surrogate_predictions[self.density_labels]
+        surrogates_hvap_uncertainty = surrogate_uncertainties[self.hvap_labels]
+        surrogates_density_uncertainty = surrogate_uncertainties[self.density_labels]
 
+        avg_density_uncertainty = torch.mean(surrogates_density_uncertainty/surrogates_density)
+        avg_hvap_uncertainty = torch.mean(surrogates_hvap_uncertainty / surrogates_hvap)
+
+        return avg_density_uncertainty, avg_hvap_uncertainty
 
 
 class Optimizer:

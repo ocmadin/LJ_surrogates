@@ -304,7 +304,7 @@ class TestOptimizer(IntegratedOptimizer):
             f'Optimization complete after {iter} iterations: Objective function value of {result.fun} and parameters of {result.x}')
 
 
-class SurrogateSearchOptimizer(IntegratedOptimizer):
+class SurrogateDESearchOptimizer(IntegratedOptimizer):
 
     def optimize(self, param_range, smirks, max_simulations, initial_samples):
         from LJ_surrogates.sampling.optimize import ForceBalanceObjectiveFunction
@@ -414,8 +414,13 @@ class SurrogateSearchOptimizer(IntegratedOptimizer):
                             self.solution_objective = simulation_objective
                             self.logger.info(
                                 f'Excellent prediction.  Accepting proposed solution with objective {simulation_objective}')
+                        params.append(copy.deepcopy(self.solution))
+                        objectives.append(copy.deepcopy(self.solution_objective))
                         iter += 1
                     else:
                         break
         self.logger.info(
             f'Optimization complete after {iter} iterations: Objective function value of {self.solution_objective} and parameters of {self.solution}')
+        np.save('parameter_vectors.npy',np.asarray(params))
+        np.save('objective_values.npy',np.asarray(objectives))
+

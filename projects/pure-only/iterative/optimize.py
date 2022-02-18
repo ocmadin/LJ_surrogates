@@ -16,7 +16,7 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-iterative-30'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-iterative-initial-10'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
@@ -25,7 +25,7 @@ device = 'cpu'
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
 params_1 = np.asarray([0.0108,1.554,0.0783,1.956,0.1108,1.8995,0.2113,1.736,0.1658,1.759,0.2099,1.726])
-# params_2 = np.load('4th_round.npy')[1]
+params_2 = np.load('4th_round.npy')[1]
 # objective = ConstrainedGaussianObjectiveFunctionNoSurrogate(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters, 0.001)
 objective = ForceBalanceObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
                                           dataplex.property_labels)
@@ -98,8 +98,9 @@ for i in range(all_to_simulate.shape[1]):
     results.append(objective.forward(all_to_simulate[i]))
 
 
-a = objective.simulation_objective(dataplex.property_measurements.values[1])
-b = objective.forward(dataplex.parameter_values.values[1])
+a = objective.simulation_objective(params_2)
+bb = objective.surrogate_avg_uncertainty(params_2)
+b = objective.forward(params_2)
 c = dataplex.property_measurements.values[1]
 d = objective.evaluate_parameter_set_multisurrogate(torch.tensor(dataplex.parameter_values.values[1]).unsqueeze(-1).T)[0].detach().numpy().squeeze()
 diff = d-c
