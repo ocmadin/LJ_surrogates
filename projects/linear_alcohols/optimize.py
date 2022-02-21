@@ -1,4 +1,4 @@
-from LJ_surrogates.sampling.optimize import ConstrainedGaussianObjectiveFunction, create_forcefields_from_optimized_params
+from LJ_surrogates.sampling.optimize import ForceBalanceObjectiveFunction, create_forcefields_from_optimized_params
 from LJ_surrogates.surrogates.collate_data import collate_physical_property_data
 import torch
 import gc
@@ -22,8 +22,8 @@ device = 'cpu'
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
 
-objective = ConstrainedGaussianObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
-                                                 0.1)
+objective = ForceBalanceObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
+                                                 dataplex.property_labels)
 objective.flatten_parameters()
 bounds = []
 for column in dataplex.parameter_values.columns:

@@ -352,11 +352,14 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                                 self.dataplex.property_measurements.values[i])
 
                             break
-                self.bounds = []
+                bounds = []
                 for column in self.dataplex.parameter_values.columns:
                     minbound = min(self.dataplex.parameter_values[column].values)
                     maxbound = max(self.dataplex.parameter_values[column].values)
-                    self.bounds.append((minbound, maxbound))
+                    bounds.append((minbound, maxbound))
+                self.bounds = np.asarray(bounds)
+                self.bounds[:,0] /= self.bounds_increment
+                self.bounds[:,1] *= self.bounds_increment
                 self.logger.info(
                     f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
 
