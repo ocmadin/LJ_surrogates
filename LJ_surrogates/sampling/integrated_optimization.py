@@ -306,7 +306,7 @@ class TestOptimizer(IntegratedOptimizer):
 
 class SurrogateDESearchOptimizer(IntegratedOptimizer):
 
-    def optimize(self, param_range, smirks, max_simulations, initial_samples):
+    def optimize(self, param_range, smirks, max_simulations, initial_samples,n_workers):
         from LJ_surrogates.sampling.optimize import ForceBalanceObjectiveFunction
         from scipy.optimize import differential_evolution
 
@@ -314,7 +314,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
         self.eta_1 = 0.01
         self.eta_2 = 0.5
         self.bounds_increment = 1.1
-        self.setup_server(n_workers=10, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
+        self.setup_server(n_workers=n_workers, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
         with self.lsf_backend:
 
             self.param_range = param_range
