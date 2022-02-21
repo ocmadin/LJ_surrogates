@@ -10,4 +10,4 @@ max_simulations = 20
 
 initial_samples = 9
 
-optimizer.optimize(param_range=param_range,smirks=smirks, max_simulations=max_simulations, initial_samples=initial_samples)
+optimizer.optimize(param_range=param_range,smirks=smirks, max_simulations=max_simulations, initial_samples=initial_samples,n_workers=25)
