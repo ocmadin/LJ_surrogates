@@ -154,22 +154,23 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
     def forward(self, parameters):
         surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
             torch.tensor(parameters).unsqueeze(-1).T)
-        surrogates_hvap = surrogate_predictions[self.hvap_labels]
-        surrogates_hmix = surrogate_predictions[self.hmix_labels]
-        surrogates_density = surrogate_predictions[self.density_labels]
+
         if len(self.density_measurements) > 0:
+            surrogates_density = surrogate_predictions[self.density_labels]
             density_objective = (1 / surrogates_density.shape[0]) * torch.sum(torch.square(
                 (self.density_measurements - surrogates_density) / self.density_denominator))
         else:
             density_objective = 0
         if len(self.hvap_measurements) > 0:
+            surrogates_hvap = surrogate_predictions[self.hvap_labels]
             hvap_objective = (1 / surrogates_hvap.shape[0]) * torch.sum(torch.square(
                 (self.hvap_measurements - surrogates_hvap) / self.hvap_denominator))
         else:
             hvap_objective = 0
         if len(self.hmix_measurements) > 0:
+            surrogates_hmix = surrogate_predictions[self.hmix_labels]
             hmix_objective = (1 / surrogates_hmix.shape[0]) * torch.sum(torch.square(
-            (self.hmix_measurements - surrogates_hmix) / self.hmix_denominator))
+                (self.hmix_measurements - surrogates_hmix) / self.hmix_denominator))
         else:
             hmix_objective = 0
         objective = density_objective + hvap_objective + hmix_objective
@@ -180,20 +181,21 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
                                                       torch.tensor(parameters).unsqueeze(-1).T)[0].squeeze()
         surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
             torch.tensor(parameters).unsqueeze(-1).T)
-        jacobian_hvap = jacobian[self.hvap_labels]
-        jacobian_hmix = jacobian[self.hmix_labels]
-        jacobian_density = jacobian[self.density_labels]
-        surrogates_density = surrogate_predictions[self.density_labels]
-        surrogates_hvap = surrogate_predictions[self.hvap_labels]
-        surrogates_hmix = surrogate_predictions[self.hmix_labels]
+
         if len(self.density_measurements) > 0:
+            jacobian_density = jacobian[self.density_labels]
+            surrogates_density = surrogate_predictions[self.density_labels]
             obj_density_jacobian = -2 / (surrogates_density.shape[0] * self.density_denominator) * torch.sum(
                 ((self.density_measurements - surrogates_density) / self.density_denominator) * jacobian_density,
                 axis=0)
         if len(self.hvap_measurements) > 0:
+            jacobian_hvap = jacobian[self.hvap_labels]
+            surrogates_hvap = surrogate_predictions[self.hvap_labels]
             obj_hvap_jacobian = -2 / (surrogates_hvap.shape[0] * self.hvap_denominator) * torch.sum(
                 ((self.hvap_measurements - surrogates_hvap) / self.hvap_denominator) * jacobian_hvap, axis=0)
         if len(self.hmix_measurements) > 0:
+            jacobian_hmix = jacobian[self.hmix_labels]
+            surrogates_hmix = surrogate_predictions[self.hmix_labels]
             obj_hmix_jacobian = -2 / (surrogates_hmix.shape[0] * self.hmix_denominator) * torch.sum(
                 ((self.hmix_measurements - surrogates_hmix) / self.hmix_denominator) * jacobian_hmix, axis=0)
 
@@ -201,22 +203,21 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
         return objective_jacobian.detach().numpy()
 
     def simulation_objective(self, simulation_outputs):
-        simulation_hvap = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
-        simulation_hmix = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
-
-        simulation_density = torch.tensor(simulation_outputs[self.density_labels]).unsqueeze(-1)
 
         if len(self.density_measurements) > 0:
+            simulation_density = torch.tensor(simulation_outputs[self.density_labels]).unsqueeze(-1)
             density_objective = (1 / simulation_density.shape[0]) * torch.sum(torch.square(
                 (self.density_measurements - simulation_density) / self.density_denominator))
         else:
             density_objective = 0
         if len(self.hvap_measurements) > 0:
+            simulation_hvap = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
             hvap_objective = (1 / simulation_hvap.shape[0]) * torch.sum(torch.square(
                 (self.hvap_measurements - simulation_hvap) / self.hvap_denominator))
         else:
             hvap_objective = 0
         if len(self.hmix_measurements) > 0:
+            simulation_hmix = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
             hmix_objective = (1 / simulation_hmix.shape[0]) * torch.sum(torch.square(
                 (self.hmix_measurements - simulation_hmix) / self.hmix_denominator))
         else:
@@ -227,15 +228,25 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
     def surrogate_avg_uncertainty(self, parameters):
         surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
             torch.tensor(parameters).unsqueeze(-1).T)
-        surrogates_hvap = surrogate_predictions[self.hvap_labels]
-        surrogates_density = surrogate_predictions[self.density_labels]
-        surrogates_hvap_uncertainty = surrogate_uncertainties[self.hvap_labels]
-        surrogates_density_uncertainty = surrogate_uncertainties[self.density_labels]
-
-        avg_density_uncertainty = torch.mean(surrogates_density_uncertainty / surrogates_density)
-        avg_hvap_uncertainty = torch.mean(surrogates_hvap_uncertainty / surrogates_hvap)
-
-        return avg_density_uncertainty, avg_hvap_uncertainty
+        if len(self.density_measurements) > 0:
+            surrogates_density = surrogate_predictions[self.density_labels]
+            surrogates_density_uncertainty = surrogate_uncertainties[self.density_labels]
+            avg_density_uncertainty = torch.mean(surrogates_density_uncertainty / surrogates_density)
+        else:
+            avg_density_uncertainty = None
+        if len(self.hvap_measurements) > 0:
+            surrogates_hvap = surrogate_predictions[self.hvap_labels]
+            surrogates_hvap_uncertainty = surrogate_uncertainties[self.hvap_labels]
+            avg_hvap_uncertainty = torch.mean(surrogates_hvap_uncertainty / surrogates_hvap)
+        else:
+            avg_hvap_uncertainty = None
+        if len(self.hmix_measurements) > 0:
+            surrogates_hmix = surrogate_predictions[self.hmix_labels]
+            surrogates_hmix_uncertainty = surrogate_uncertainties[self.hmix_labels]
+            avg_hmix_uncertainty = torch.mean(surrogates_hmix_uncertainty / surrogates_hmix)
+        else:
+            avg_hmix_uncertainty = None
+        return avg_density_uncertainty, avg_hvap_uncertainty, avg_hmix_uncertainty
 
 
 class Optimizer:
