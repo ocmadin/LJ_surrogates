@@ -10,6 +10,7 @@ from openff.toolkit.typing.engines.smirnoff.forcefield import ForceField
 from simtk import openmm, unit
 import time
 
+
 class ObjectiveFunction(torch.nn.Module):
     def __init__(self, multisurrogate, targets, initial_params):
         super(ObjectiveFunction, self).__init__()
@@ -132,59 +133,95 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
         self.property_labels = property_labels
         density_labels = []
         hvap_labels = []
+        hmix_labels = []
         for i, label in enumerate(property_labels):
             if label.endswith('Density'):
                 density_labels.append(i)
             elif label.endswith('EnthalpyOfVaporization'):
                 hvap_labels.append(i)
+            elif label.endswith('EnthalpyOfMixing'):
+                hmix_labels.append(i)
         self.hvap_labels = np.asarray(hvap_labels)
+        self.hmix_labels = np.asarray(hmix_labels)
         self.density_labels = np.asarray(density_labels)
         self.hvap_measurements = self.experimental_values[self.hvap_labels]
+        self.hmix_measurements = self.experimental_values[self.hmix_labels]
         self.density_measurements = self.experimental_values[self.density_labels]
         self.hvap_denominator = 25.683
-        self.density_denominator = 0.0482*2
+        self.density_denominator = 0.0482 * 2
+        self.hmix_denominator = 1.594
 
     def forward(self, parameters):
         surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
             torch.tensor(parameters).unsqueeze(-1).T)
         surrogates_hvap = surrogate_predictions[self.hvap_labels]
+        surrogates_hmix = surrogate_predictions[self.hmix_labels]
         surrogates_density = surrogate_predictions[self.density_labels]
-        density_objective = (1 / surrogates_density.shape[0]) * torch.sum(torch.square(
-            (self.density_measurements - surrogates_density) / self.density_denominator))
-        hvap_objective = (1 / surrogates_hvap.shape[0]) * torch.sum(torch.square(
-            (self.hvap_measurements - surrogates_hvap) / self.hvap_denominator))
-
-        objective = density_objective + hvap_objective
+        if len(self.density_measurements) > 0:
+            density_objective = (1 / surrogates_density.shape[0]) * torch.sum(torch.square(
+                (self.density_measurements - surrogates_density) / self.density_denominator))
+        else:
+            density_objective = 0
+        if len(self.hvap_measurements) > 0:
+            hvap_objective = (1 / surrogates_hvap.shape[0]) * torch.sum(torch.square(
+                (self.hvap_measurements - surrogates_hvap) / self.hvap_denominator))
+        else:
+            hvap_objective = 0
+        if len(self.hmix_measurements) > 0:
+            hmix_objective = (1 / surrogates_hmix.shape[0]) * torch.sum(torch.square(
+            (self.hmix_measurements - surrogates_hmix) / self.hmix_denominator))
+        else:
+            hmix_objective = 0
+        objective = density_objective + hvap_objective + hmix_objective
         return objective.item()
 
     def forward_jac(self, parameters):
         jacobian = torch.autograd.functional.jacobian(self.evaluate_parameter_set_multisurrogate,
-            torch.tensor(parameters).unsqueeze(-1).T)[0].squeeze()
+                                                      torch.tensor(parameters).unsqueeze(-1).T)[0].squeeze()
         surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
             torch.tensor(parameters).unsqueeze(-1).T)
         jacobian_hvap = jacobian[self.hvap_labels]
+        jacobian_hmix = jacobian[self.hmix_labels]
         jacobian_density = jacobian[self.density_labels]
         surrogates_density = surrogate_predictions[self.density_labels]
         surrogates_hvap = surrogate_predictions[self.hvap_labels]
+        surrogates_hmix = surrogate_predictions[self.hmix_labels]
+        if len(self.density_measurements) > 0:
+            obj_density_jacobian = -2 / (surrogates_density.shape[0] * self.density_denominator) * torch.sum(
+                ((self.density_measurements - surrogates_density) / self.density_denominator) * jacobian_density,
+                axis=0)
+        if len(self.hvap_measurements) > 0:
+            obj_hvap_jacobian = -2 / (surrogates_hvap.shape[0] * self.hvap_denominator) * torch.sum(
+                ((self.hvap_measurements - surrogates_hvap) / self.hvap_denominator) * jacobian_hvap, axis=0)
+        if len(self.hmix_measurements) > 0:
+            obj_hmix_jacobian = -2 / (surrogates_hmix.shape[0] * self.hmix_denominator) * torch.sum(
+                ((self.hmix_measurements - surrogates_hmix) / self.hmix_denominator) * jacobian_hmix, axis=0)
 
-        obj_density_jacobian = -2 / (surrogates_density.shape[0] * self.density_denominator) * torch.sum(
-            ((self.density_measurements - surrogates_density) / self.density_denominator) * jacobian_density,axis=0)
-        obj_hvap_jacobian = -2 / (surrogates_hvap.shape[0] * self.hvap_denominator) * torch.sum(
-            ((self.hvap_measurements - surrogates_hvap) / self.hvap_denominator) * jacobian_hvap,axis=0)
-
-        objective_jacobian = obj_density_jacobian + obj_hvap_jacobian
+        objective_jacobian = obj_density_jacobian + obj_hvap_jacobian + obj_hmix_jacobian
         return objective_jacobian.detach().numpy()
 
     def simulation_objective(self, simulation_outputs):
         simulation_hvap = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
+        simulation_hmix = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
+
         simulation_density = torch.tensor(simulation_outputs[self.density_labels]).unsqueeze(-1)
 
-        density_objective = (1 / simulation_density.shape[0]) * torch.sum(torch.square(
-            (self.density_measurements - simulation_density) / self.density_denominator))
-        hvap_objective = (1 / simulation_hvap.shape[0]) * torch.sum(torch.square(
-            (self.hvap_measurements - simulation_hvap) / self.hvap_denominator))
-
-        objective = density_objective + hvap_objective
+        if len(self.density_measurements) > 0:
+            density_objective = (1 / simulation_density.shape[0]) * torch.sum(torch.square(
+                (self.density_measurements - simulation_density) / self.density_denominator))
+        else:
+            density_objective = 0
+        if len(self.hvap_measurements) > 0:
+            hvap_objective = (1 / simulation_hvap.shape[0]) * torch.sum(torch.square(
+                (self.hvap_measurements - simulation_hvap) / self.hvap_denominator))
+        else:
+            hvap_objective = 0
+        if len(self.hmix_measurements) > 0:
+            hmix_objective = (1 / simulation_hmix.shape[0]) * torch.sum(torch.square(
+                (self.hmix_measurements - simulation_hmix) / self.hmix_denominator))
+        else:
+            hmix_objective = 0
+        objective = density_objective + hvap_objective + hmix_objective
         return objective.item()
 
     def surrogate_avg_uncertainty(self, parameters):
@@ -195,7 +232,7 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
         surrogates_hvap_uncertainty = surrogate_uncertainties[self.hvap_labels]
         surrogates_density_uncertainty = surrogate_uncertainties[self.density_labels]
 
-        avg_density_uncertainty = torch.mean(surrogates_density_uncertainty/surrogates_density)
+        avg_density_uncertainty = torch.mean(surrogates_density_uncertainty / surrogates_density)
         avg_hvap_uncertainty = torch.mean(surrogates_hvap_uncertainty / surrogates_hvap)
 
         return avg_density_uncertainty, avg_hvap_uncertainty
@@ -255,7 +292,7 @@ def create_forcefields_from_optimized_params(params, labels, input_forcefield):
     forcefield.to_file(os.path.join('optimized_ffs', str(df.shape[0] + 1), 'force-field.offxml'))
 
 
-def create_forcefield_for_simulation(params,labels,input_forcefield):
+def create_forcefield_for_simulation(params, labels, input_forcefield):
     params = np.asarray(params)
     df = pandas.DataFrame(params, columns=labels)
     os.makedirs('optimized_ffs', exist_ok=True)

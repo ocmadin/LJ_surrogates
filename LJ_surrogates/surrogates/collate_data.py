@@ -328,29 +328,51 @@ class ParameterSetDataMultiplex:
 
     def calculate_ff_rmses(self):
         hvap_reference = []
+        hmix_reference = []
         density_reference = []
+        binary_density_reference = []
         hvap_rmse = []
         density_rmse = []
+        hmix_rmse = []
+        binary_density_rmse = []
         for property in self.properties.properties:
             if type(property) == enthalpy.EnthalpyOfVaporization:
                 hvap_reference.append(property.value.m)
-            elif type(property) == density.Density:
+            elif type(property) == density.Density and property.substance.number_of_components == 1:
                 density_reference.append(property.value.m)
+            elif type(property) == density.Density and property.substance.number_of_components == 2:
+                binary_density_reference.append(property.value.m)
+            elif type(property) == enthalpy.EnthalpyOfMixing:
+                hmix_reference.append(property.value.m)
         hvap_reference = np.asarray(hvap_reference)
         density_reference = np.asarray(density_reference)
+        hmix_reference = np.asarray(hmix_reference)
+        binary_density_reference = np.asarray(binary_density_reference)
         for i in range(self.property_measurements.values.shape[0]):
             hvap_estimate = []
             density_estimate = []
+            hmix_estimate = []
+            binary_density_estimate = []
             for j in range(len(self.property_measurements.values[0, :])):
                 if self.property_measurements.columns[j].endswith('EnthalpyOfVaporization'):
                     hvap_estimate.append(self.property_measurements.values[i, j])
+                elif self.property_measurements.columns[j].endswith('EnthalpyOfMixing'):
+                    hmix_estimate.append(self.property_measurements.values[i, j])
+                elif self.property_measurements.columns[j].endswith('Density') and '|' in self.property_measurements.columns[j]:
+                    binary_density_estimate.append(self.property_measurements.values[i,j])
                 elif self.property_measurements.columns[j].endswith('Density'):
                     density_estimate.append(self.property_measurements.values[i, j])
             hvap_estimate = np.asarray(hvap_estimate)
             density_estimate = np.asarray(density_estimate)
-            hvap_rmse.append(np.mean(np.sqrt(np.square(hvap_reference - hvap_estimate))))
-            density_rmse.append(np.mean(np.sqrt(np.square(density_reference - density_estimate))))
-        return hvap_rmse, density_rmse
+            if len(hvap_estimate) > 0:
+                hvap_rmse.append(np.sqrt(np.mean(np.square(hvap_reference - hvap_estimate))))
+            if len(density_estimate) > 0:
+                density_rmse.append(np.sqrt(np.mean(np.square(density_reference - density_estimate))))
+            if len(hmix_estimate) > 0:
+                hmix_rmse.append(np.sqrt(np.mean(np.square(hmix_reference - hmix_estimate))))
+            if len(binary_density_estimate) > 0:
+                binary_density_rmse.append(np.sqrt(np.mean(np.square(binary_density_reference - binary_density_estimate))))
+        return hvap_rmse, density_rmse, hmix_rmse, binary_density_rmse
 
 
 

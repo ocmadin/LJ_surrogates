@@ -18,22 +18,25 @@ from LJ_surrogates.plotting.plotting import plot_triangle
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-iterative-50'
-benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-validation'
+# path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-validation'
+# benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-validation'
+path = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/estimated_results'
+benchmark_path = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/estimated_results'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1-3-0.offxml'
-dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
+# dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
+dataset_json = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/optimized_ffs/1/test-set-collection.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
-dataplex.plot_properties()
+# dataplex.plot_properties()
 
 benchmark_dataplex = collate_physical_property_data(benchmark_path, smirks_types_to_change, forcefield,
                                           dataset_json, device)
 
-hvap_rmse, density_rmse = benchmark_dataplex.calculate_ff_rmses()
-hvap_surr_rmse, density_surr_rmse = calculate_ff_rmses_surrogate(dataplex, benchmark_dataplex.parameter_values.values)
+hvap_rmse, density_rmse, hmix_rmse, binary_density_rmse = benchmark_dataplex.calculate_ff_rmses()
+# hvap_surr_rmse, density_surr_rmse = calculate_ff_rmses_surrogate(dataplex, benchmark_dataplex.parameter_values.values)
 
 abs_deviation, percent_deviation, comb_uncert, in_uncert = dataplex.calculate_surrogate_simulation_deviation(benchmark_dataplex)
 
@@ -56,3 +59,37 @@ plt.close()
 # plt.legend()
 # plt.savefig(os.path.join('benchmark','density_rmse.png'),dpi=300)
 # plt.close()
+
+true_values = []
+for property in benchmark_dataplex.properties.properties:
+    true_values.append(property.value.m)
+
+true_values = np.asarray(true_values)
+
+# print(true_values)
+#
+# print(benchmark_dataplex.property_measurements.values[9])
+# print(benchmark_dataplex.property_measurements.values[24])
+# print(benchmark_dataplex.property_measurements.values[20])
+
+
+mfo = np.asarray([density_rmse[0],hvap_rmse[0],binary_density_rmse[0],hmix_rmse[0]])
+off100 = np.asarray([0.03,9.92,0.025,0.61])
+sim_opt = np.asarray([0.018, 7.47, 0.018, 0.44])
+
+all_benchmarks = np.stack((off100,sim_opt,mfo)).T
+
+fig,ax = plt.subplots(1,4, figsize=(16,5))
+colors = ['blue','orange','green']
+labels = ['OpenFF 1.0.0', 'Simulation \n only', 'Multi-Fidelity']
+props = [r'$\rho_l$',r'$\Delta H_{vap}$', r'$\rho_l(x)$', r'$\Delta H_{mix}(x)$']
+units = ['g/mL', 'kJ/mol', 'g/mL', 'kJ/mol']
+for i in range(len(props)):
+    ax[i].bar(labels,all_benchmarks[i], color=colors)
+    ax[i].set_ylabel(r'RMSE, '+units[i], fontsize=16)
+    ax[i].set_title(props[i], fontsize=16)
+    # ax[i].tick_params('x',labelrotation=45)
+fig.suptitle('Optimization Benchmarking', fontsize=20)
+fig.tight_layout()
+fig.savefig('rmse_comparison.png', dpi=300)
+fig.show()

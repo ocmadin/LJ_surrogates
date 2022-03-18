@@ -16,10 +16,10 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-iterative-initial-10'
+path = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/estimated_results'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
-dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
+dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/benchmark-set-collection.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
@@ -67,7 +67,15 @@ simulation_opt = np.asarray(
     [0.008766206, 1.46527, 0.080329, 1.998187, 0.0993459, 1.9809416, 0.20698197, 1.7208416, 0.16197438,
      1.7737039, 0.2106341, 1.71455])
 
-simulation_objective = objective.forward(simulation_opt)
+simulation_objective = objective.simulation_objective(dataplex.property_measurements.values[10])
+
+before = time.time()
+
+objective_surr = objective.forward(simulation_opt)
+
+after = time.time()
+
+speed = after-before
 
 params_to_simulate = [simulation_opt, params[np.argmin(objs)], params_l_bfgs_b[np.argmin(objs_l_bfgs_b)]]
 
@@ -98,9 +106,10 @@ for i in range(all_to_simulate.shape[1]):
     results.append(objective.forward(all_to_simulate[i]))
 
 
-a = objective.simulation_objective(params_2)
+
 bb = objective.surrogate_avg_uncertainty(params_2)
 b = objective.forward(params_2)
 c = dataplex.property_measurements.values[1]
+a = objective.simulation_objective(c)
 d = objective.evaluate_parameter_set_multisurrogate(torch.tensor(dataplex.parameter_values.values[1]).unsqueeze(-1).T)[0].detach().numpy().squeeze()
 diff = d-c
