@@ -314,6 +314,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
         self.eta_1 = 0.01
         self.eta_2 = 0.5
         self.bounds_increment = 1.1
+        self.max_bounds_expansions = 3
         self.setup_server(n_workers=n_workers, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
         with self.lsf_backend:
 
@@ -332,7 +333,6 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
             objectives = []
             params = []
             while self.n_simulations <= self.max_simulations:
-                self.search_failure_count = 0
                 if iter == 0:
                     self.build_physical_property_surrogate()
 
@@ -357,30 +357,32 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                     minbound = min(self.dataplex.parameter_values[column].values)
                     maxbound = max(self.dataplex.parameter_values[column].values)
                     bounds.append((minbound, maxbound))
-                self.bounds = np.asarray(bounds)
-                self.bounds[:,0] /= (self.bounds_increment ** (1+self.search_failure_count))
-                self.bounds[:,1] *= (self.bounds_increment ** (1+self.search_failure_count))
-                self.logger.info(
-                    f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
+                while i < self.max_bounds_expansions:
+                    self.bounds = np.asarray(bounds)
+                    self.bounds[:,0] /= (self.bounds_increment ** (1+i))
+                    self.bounds[:,1] *= (self.bounds_increment ** (1+i))
+                    self.logger.info(
+                        f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
 
-                self.logger.info(
-                    f'Optimization Iteration {iter}: optimizing over a surrogate built from {self.n_simulations} datasets')
+                    self.logger.info(
+                        f'Optimization Iteration {iter}: optimizing over a surrogate built from {self.n_simulations} datasets')
 
-                surrogate_result = differential_evolution(self.objective, self.bounds)
-                self.logger.info(
-                    f'Surrogate proposes solution with surrogate objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
-                predicted_reduction = self.solution_objective - surrogate_result.fun
+                    surrogate_result = differential_evolution(self.objective, self.bounds)
+                    self.logger.info(
+                        f'Surrogate proposes solution with surrogate objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
+                    predicted_reduction = self.solution_objective - surrogate_result.fun
+                    if surrogate_result.fun >= self.solution_objective:
+                        self.logger.info(
+                            f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
+                        self.logger.info(
+                            f'Proposed solution discarded and search space increased')
+                    else:
+                        break
 
                 if surrogate_result.fun >= self.solution_objective:
-                    if self.search_failure_count > 3:
-                        self.logger.info(
+                    self.logger.info(
                             f'Surrogate search unable to find improved candidate solution. Terminating program')
-                        raise ValueError("
-                    self.logger.info(
-                        f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
-                    self.logger.info(
-                        f'Proposed solution discarded and search space increased')
-                    self.search_failure_count += 1
+                    raise ValueError('Unable to find improved solution with surrogate.  The problem is likely ill-posed.')
                 else:
                     self.logger.info(
                         f'Surrogate proposed solution has objective {surrogate_result.fun}, < current simulation objective {self.solution_objective}')
