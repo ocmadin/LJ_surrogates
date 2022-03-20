@@ -217,7 +217,7 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
         else:
             hvap_objective = 0
         if len(self.hmix_measurements) > 0:
-            simulation_hmix = torch.tensor(simulation_outputs[self.hvap_labels]).unsqueeze(-1)
+            simulation_hmix = torch.tensor(simulation_outputs[self.hmix_labels]).unsqueeze(-1)
             hmix_objective = (1 / simulation_hmix.shape[0]) * torch.sum(torch.square(
                 (self.hmix_measurements - simulation_hmix) / self.hmix_denominator))
         else:

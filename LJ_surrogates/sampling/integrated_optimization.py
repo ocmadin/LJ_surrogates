@@ -332,6 +332,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
             objectives = []
             params = []
             while self.n_simulations <= self.max_simulations:
+                self.search_failure_count = 0
                 if iter == 0:
                     self.build_physical_property_surrogate()
 
@@ -344,7 +345,6 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                 if iter == 0:
                     self.solution = copy.deepcopy(self.objective.flat_parameters)
                     for i in range(self.dataplex.parameter_values.shape[0]):
-                        print(self.dataplex.parameter_values.values[i])
                         if np.allclose(self.dataplex.parameter_values.values[i], self.solution):
                             self.logger.info(
                                 f'Computing simulation objective for parameter set {self.solution}')
@@ -358,8 +358,8 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                     maxbound = max(self.dataplex.parameter_values[column].values)
                     bounds.append((minbound, maxbound))
                 self.bounds = np.asarray(bounds)
-                self.bounds[:,0] /= self.bounds_increment
-                self.bounds[:,1] *= self.bounds_increment
+                self.bounds[:,0] /= (self.bounds_increment ** (1+self.search_failure_count))
+                self.bounds[:,1] *= (self.bounds_increment ** (1+self.search_failure_count))
                 self.logger.info(
                     f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
 
@@ -372,11 +372,15 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                 predicted_reduction = self.solution_objective - surrogate_result.fun
 
                 if surrogate_result.fun >= self.solution_objective:
+                    if self.search_failure_count > 3:
+                        self.logger.info(
+                            f'Surrogate search unable to find improved candidate solution. Terminating program')
+                        raise ValueError("
                     self.logger.info(
                         f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
                     self.logger.info(
                         f'Proposed solution discarded and search space increased')
-                    self.bounds *= self.bounds_increment
+                    self.search_failure_count += 1
                 else:
                     self.logger.info(
                         f'Surrogate proposed solution has objective {surrogate_result.fun}, < current simulation objective {self.solution_objective}')
