@@ -2,7 +2,7 @@
 #
 # Set the job name and wall time / memory limit
 #BSUB -J optimize
-#BSUB -W 72:00
+#BSUB -W 168:00
 #BSUB -M 8
 #
 # Set the output and error output paths.
