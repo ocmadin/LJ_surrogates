@@ -350,17 +350,18 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                                 f'Computing simulation objective for parameter set {self.solution}')
                             self.solution_objective = self.objective.simulation_objective(
                                 self.dataplex.property_measurements.values[i])
-
+                            simulation_objective = self.solution_objective
                             break
                 bounds = []
                 for column in self.dataplex.parameter_values.columns:
                     minbound = min(self.dataplex.parameter_values[column].values)
                     maxbound = max(self.dataplex.parameter_values[column].values)
                     bounds.append((minbound, maxbound))
-                while i < self.max_bounds_expansions:
+                bounds_expansion_counter = 0
+                while bounds_expansion_counter < self.max_bounds_expansions:
                     self.bounds = np.asarray(bounds)
-                    self.bounds[:,0] /= (self.bounds_increment ** (1+i))
-                    self.bounds[:,1] *= (self.bounds_increment ** (1+i))
+                    self.bounds[:,0] /= (self.bounds_increment ** (1+bounds_expansion_counter))
+                    self.bounds[:,1] *= (self.bounds_increment ** (1+bounds_expansion_counter))
                     self.logger.info(
                         f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
 
@@ -376,6 +377,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                             f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
                         self.logger.info(
                             f'Proposed solution discarded and search space increased')
+                        bounds_expansion_counter += 1
                     else:
                         break
 
