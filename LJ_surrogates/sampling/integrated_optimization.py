@@ -306,7 +306,7 @@ class TestOptimizer(IntegratedOptimizer):
 
 class SurrogateDESearchOptimizer(IntegratedOptimizer):
 
-    def optimize(self, param_range, smirks, max_simulations, initial_samples,n_workers):
+    def optimize(self, param_range, smirks, max_simulations, initial_samples,n_workers, use_cached_data=False, cached_data_location=None):
         from LJ_surrogates.sampling.optimize import ForceBalanceObjectiveFunction
         from scipy.optimize import differential_evolution
 
@@ -316,18 +316,22 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
         self.bounds_increment = 1.1
         self.max_bounds_expansions = 3
         self.setup_server(n_workers=n_workers, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
-        with self.lsf_backend:
+        if use_cached_data is True:
+            shutil.copytree(cached_data_location,'estimated_results')
+            self.n_simulations += len(os.listdir('estimated_results'))/2
+        else:
+            with self.lsf_backend:
 
-            self.param_range = param_range
-            self.smirks = smirks
-            n_samples = initial_samples
+                self.param_range = param_range
+                self.smirks = smirks
+                n_samples = initial_samples
 
-            self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range,
-                                             include_initial_ff=True)
+                self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range,
+                                                 include_initial_ff=True)
 
-            folder_list = [str(i + 1) for i in range(n_samples + 1)]
+                folder_list = [str(i + 1) for i in range(n_samples + 1)]
 
-            self.submit_requests(folder_path=self.force_field_directory, folder_list=folder_list)
+                self.submit_requests(folder_path=self.force_field_directory, folder_list=folder_list)
 
             iter = 0
             objectives = []
@@ -350,7 +354,6 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                                 f'Computing simulation objective for parameter set {self.solution}')
                             self.solution_objective = self.objective.simulation_objective(
                                 self.dataplex.property_measurements.values[i])
-
                             break
                 bounds = []
                 for column in self.dataplex.parameter_values.columns:
