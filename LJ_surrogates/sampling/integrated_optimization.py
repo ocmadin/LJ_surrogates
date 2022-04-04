@@ -318,13 +318,15 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
         self.setup_server(n_workers=n_workers, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
 
         with self.lsf_backend:
+            self.smirks = smirks
+            self.param_range = param_range
             if use_cached_data is True:
                 shutil.copytree(cached_data_location,'estimated_results')
                 self.n_simulations += len(os.listdir('estimated_results'))/2
                 self.results_directory = 'estimated_results'
+                os.makedirs(os.path.join('force-fields'))
+                self.force_field_directory = os.path.join('force-fields')
             else:
-                self.param_range = param_range
-                self.smirks = smirks
                 n_samples = initial_samples
 
                 self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range,
