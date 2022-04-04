@@ -321,6 +321,10 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
             if use_cached_data is True:
                 shutil.copytree(cached_data_location,'estimated_results')
                 self.n_simulations += len(os.listdir('estimated_results'))/2
+                os.makedirs(os.path.join('force-fields'))
+                self.force_field_directory = os.path.join('force-fields')
+                self.smirks = smirks
+                self.param_range = param_range
             else:
                 self.param_range = param_range
                 self.smirks = smirks
