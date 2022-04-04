@@ -10,4 +10,4 @@ max_simulations = 1
 
 initial_samples = 0
 
-optimizer.optimize(param_range=param_range,smirks=smirks, max_simulations=max_simulations, initial_samples=initial_samples,n_workers=50)
+optimizer.optimize(param_range=param_range,smirks=smirks, max_simulations=max_simulations, initial_samples=initial_samples,n_workers=50, use_cached_data=True, cached_data_location='cached_data')
