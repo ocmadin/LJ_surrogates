@@ -316,12 +316,12 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
         self.bounds_increment = 1.1
         self.max_bounds_expansions = 3
         self.setup_server(n_workers=n_workers, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
-        if use_cached_data is True:
-            shutil.copytree(cached_data_location,'estimated_results')
-            self.n_simulations += len(os.listdir('estimated_results'))/2
-        else:
-            with self.lsf_backend:
 
+        with self.lsf_backend:
+            if use_cached_data is True:
+                shutil.copytree(cached_data_location,'estimated_results')
+                self.n_simulations += len(os.listdir('estimated_results'))/2
+            else:
                 self.param_range = param_range
                 self.smirks = smirks
                 n_samples = initial_samples
