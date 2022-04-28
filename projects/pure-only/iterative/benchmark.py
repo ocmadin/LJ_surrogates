@@ -18,14 +18,14 @@ from LJ_surrogates.plotting.plotting import plot_triangle
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-# path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-validation'
-# benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-validation'
-path = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/estimated_results'
-benchmark_path = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/estimated_results'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-integrated-test-full'
+benchmark_path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-integrated-test-full'
+# path = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only-integrated-test-full'
+# benchmark_path = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only-integrated-test-full'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1-3-0.offxml'
-# dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
-dataset_json = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/optimized_ffs/1/test-set-collection.json'
+dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/iterative-test-set-collection-initial.json'
+# dataset_json = '/home/owenmadin/Documents/python/LJ_surrogates/projects/pure-only/integrated/benchmark/optimized_ffs/1/test-set-collection.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
