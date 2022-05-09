@@ -16,6 +16,7 @@ import warnings
 import logging
 from openff.evaluator.backends import QueueWorkerResources
 from openff.evaluator.backends.dask import DaskLSFBackend
+from openff.evaluator.workflow.schemas import ProtocolGroupSchema
 from openff.evaluator.server import EvaluatorServer
 import copy
 
@@ -213,6 +214,10 @@ class IntegratedOptimizer:
 
         density_schema = Density.default_simulation_schema(n_molecules=1000)
         h_mix_schema = EnthalpyOfMixing.default_simulation_schema(n_molecules=1000)
+
+        h_mix_schema.workflow_schema.protocol_schemas[4].protocol_schemas['production_simulation_component_$(component_replicator)'].inputs['.steps_per_iteration'] = 1000
+        h_mix_schema.workflow_schema.protocol_schemas[11].protocol_schemas['production_simulation_mixture'].inputs['.steps_per_iteration'] = 1000
+        density_schema.workflow_schema.protocol_schemas[4].protocol_schemas['production_simulation'].inputs['.steps_per_iteration'] = 1000
 
         # Create an options object which defines how the data set should be estimated.
         estimation_options = RequestOptions()

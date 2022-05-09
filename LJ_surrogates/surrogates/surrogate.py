@@ -101,12 +101,6 @@ class GPSurrogateModel:
         delattr(self, 'X')
         delattr(self, 'Y')
 
-    def build_surrogate_gpflow(self):
-        kernel = gpflow.kernels.SquaredExponential()
-        self.model_gpflow = gpflow.models.GPR(data=(self.X_gpflow, self.Y_gpflow), kernel=kernel)
-        opt = gpflow.optimizers.Scipy()
-        opt_logs = opt.minimize(self.model_gpflow.training_loss, self.model_gpflow.trainable_variables,
-                                options=dict(maxiter=10000))
 
     def evaluate_parameters(self, parameter_set):
         if parameter_set.shape[1] != self.X.shape[1]:
