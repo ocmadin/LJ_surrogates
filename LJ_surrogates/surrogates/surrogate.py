@@ -214,7 +214,7 @@ def build_multisurrogate_lightweight_botorch(parameter_data, property_data, prop
     likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
     from botorch.models import FixedNoiseGP
     from botorch.fit import fit_gpytorch_model
-    model = FixedNoiseGP(X, Y, Y_err, covar_module=covar_module)
+    model = FixedNoiseGP(X, Y, torch.square(Y_err), covar_module=covar_module)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
     model.eval()
@@ -297,7 +297,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
     means = []
     uncertainties = []
     for i in range(train_X.shape[0]):
-        model = FixedNoiseGP(train_X[i], train_Y[i], train_Y_err[i],covar_module=covar_module).cuda()
+        model = FixedNoiseGP(train_X[i], train_Y[i], torch.square(train_Y_err[i]),covar_module=covar_module).cuda()
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
         from botorch.fit import fit_gpytorch_model
         fit_gpytorch_model(mll)
@@ -365,6 +365,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
         fig.colorbar(s)
         fig.suptitle('Deviation From Simulation')
         fig.savefig(os.path.join('result','validation','deviation',str(property_labels[i]) + '.png'))
+        plt.close()
     summary_df = np.asarray(summary_df)
     summary_df = pandas.DataFrame(summary_df,columns=['Surrogate RMSE from Simulation','Max Surrogate Error','Average Surrogate Uncertainty','Max Surrogate Uncertainty', '% within combined uncertainty'],index=property_labels)
     summary_df.to_csv(os.path.join('result','validation', 'cross_validation_summary.csv'))
