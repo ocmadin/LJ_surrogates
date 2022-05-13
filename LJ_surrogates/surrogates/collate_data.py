@@ -217,8 +217,8 @@ class ParameterSetDataMultiplex:
                                                                 individual_property_measurements,
                                                                 individual_property_uncertainties, self.device)
             if do_cross_validation is True:
-                build_surrogates_loo_cv(self.parameter_values.values, individual_property_measurements,
-                                        individual_property_uncertainties, self.property_labels[i],self.fl)
+                build_surrogates_loo_cv(self.parameter_values.values, surrogate_measurements,
+                                        surrogate_uncertainties, self.property_labels, self.parameter_labels)
             model.train_targets = model.train_targets.detach()
             surrogates.append(model)
             botorch_surrogates.append(botorch_model)
@@ -422,8 +422,8 @@ def get_training_data_new(data, properties, parameters, device):
     # temp_labels = dataplex.property_labels[1:19]
     # temp_labels.extend(dataplex.property_labels[20:])
     # dataplex.property_labels=temp_labels
-    dataplex.build_multisurrogates(do_cross_validation=False)
-    # dataplex.build_surrogates()
+    dataplex.build_multisurrogates(do_cross_validation=True)
+    # dataplex.build_surrogates(do_cross_validation=False)
     return dataplex
 
 
