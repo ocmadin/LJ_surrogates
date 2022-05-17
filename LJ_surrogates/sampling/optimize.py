@@ -57,8 +57,8 @@ class ObjectiveFunction(torch.nn.Module):
     def evaluate_surrogate_explicit_params(self, surrogate, parameter_set):
         with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                 True) and gpytorch.settings.fast_pred_var(True):
-            eval = surrogate(parameter_set)
-        return eval.mean, eval.variance
+            eval = surrogate.posterior(parameter_set)
+        return eval.mean.T, eval.variance.T
 
     def evaluate_parameter_set_multisurrogate(self, parameter_set):
         self.parameter_set = parameter_set

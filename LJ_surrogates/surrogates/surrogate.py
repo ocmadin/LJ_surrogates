@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas
 import copy
 import seaborn
+from gpytorch.priors.torch_priors import GammaPrior
 
 class GPSurrogateModel:
     # I don't think this code actually gets used.
@@ -215,10 +216,39 @@ def build_multisurrogate_lightweight_botorch(parameter_data, property_data, prop
     from botorch.models import FixedNoiseGP
     from botorch.fit import fit_gpytorch_model
     model = FixedNoiseGP(X, Y, torch.square(Y_err), covar_module=covar_module)
+    # priors = {"lengthscale": GammaPrior(3.0, 6.0),
+    #           "outputscale": GammaPrior(2.0, 0.15),
+    #           "noise_var": GammaPrior(1.1, 0.05)}
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
     fit_gpytorch_model(mll)
     model.eval()
     model.likelihood.eval()
+    return model
+
+def build_multisurrogate_independent_botorch(parameter_data, property_data, property_uncertainties, device):
+    # cuda = torch.device('cuda')
+    # X = torch.tensor(parameter_data).to(device=cuda)
+    # Y = torch.tensor(property_data).T.to(device=cuda)
+    # Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
+    X = torch.tensor(parameter_data)
+    Y = torch.tensor(property_data).T
+    Y_err = torch.tensor(property_uncertainties).T
+    models = []
+    from botorch.models import FixedNoiseGP
+    from botorch.fit import fit_gpytorch_model
+    from botorch.models import ModelListGP
+    for i in range(Y.shape[1]):
+        covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+
+        likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
+
+        model = FixedNoiseGP(X, Y[:,i].unsqueeze(0).T, torch.square(Y_err)[:,i].unsqueeze(0).T, covar_module=covar_module)
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+        fit_gpytorch_model(mll)
+        model.eval()
+        model.likelihood.eval()
+        models.append(model)
+    model = ModelListGP(*models)
     return model
 
 def build_multisurrogate_lightweight(parameter_data, property_data, property_uncertainties, device):
@@ -297,7 +327,7 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
     means = []
     uncertainties = []
     for i in range(train_X.shape[0]):
-        model = FixedNoiseGP(train_X[i], train_Y[i], torch.square(train_Y_err[i]),covar_module=covar_module).cuda()
+        model = FixedNoiseGP(train_X[i], train_Y[i], torch.square(train_Y_err[i]), covar_module=covar_module).cuda()
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
         from botorch.fit import fit_gpytorch_model
         fit_gpytorch_model(mll)
@@ -369,6 +399,110 @@ def build_surrogates_loo_cv(parameter_data, property_data, property_uncertaintie
     summary_df = np.asarray(summary_df)
     summary_df = pandas.DataFrame(summary_df,columns=['Surrogate RMSE from Simulation','Max Surrogate Error','Average Surrogate Uncertainty','Max Surrogate Uncertainty', '% within combined uncertainty'],index=property_labels)
     summary_df.to_csv(os.path.join('result','validation', 'cross_validation_summary.csv'))
+
+def build_surrogates_loo_cv_independent(parameter_data, property_data, property_uncertainties, property_labels,
+                            parameter_labels):
+    cuda = torch.device('cuda')
+    X = torch.tensor(parameter_data).to(device=cuda)
+    Y = torch.tensor(property_data).T.to(device=cuda)
+    Y_err = torch.tensor(property_uncertainties).T.to(device=cuda)
+    from botorch.cross_validation import gen_loo_cv_folds
+    cv_folds = gen_loo_cv_folds(X, Y, Y_err)
+    train_X = cv_folds.train_X
+    train_Y = cv_folds.train_Y
+    train_Y_err = cv_folds.train_Yvar
+    test_X = cv_folds.test_X
+    test_Y = cv_folds.test_Y.squeeze(1).cpu().numpy()
+    test_Y_err = cv_folds.test_Yvar.squeeze(1).cpu().numpy()
+
+    from botorch.models import ModelListGP, FixedNoiseGP
+    means = []
+    uncertainties = []
+    for i in range(train_X.shape[0]):
+        models = []
+        for j in range(train_Y.shape[2]):
+            covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+            model = FixedNoiseGP(train_X[i], train_Y[i][:,j].unsqueeze(1), torch.square(train_Y_err[i][:,j].unsqueeze(1)), covar_module=covar_module).cuda()
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+            from botorch.fit import fit_gpytorch_model
+            fit_gpytorch_model(mll)
+            model.eval()
+            model.likelihood.eval()
+            models.append(model)
+        model = ModelListGP(*models)
+
+        output = model.posterior(test_X[i])
+        mean = output.mean.T.detach().cpu().numpy()
+        stdev = torch.sqrt(output.variance.T).detach().cpu().numpy()
+        means.append(mean)
+        uncertainties.append(stdev)
+    means = np.asarray(means)
+    uncertainties = np.asarray(uncertainties)
+    if property_data.shape[0] > 1:
+        means = means.squeeze()
+        uncertainties = uncertainties.squeeze()
+    os.makedirs(os.path.join('result', 'validation', 'parity'), exist_ok=True)
+    os.makedirs(os.path.join('result', 'validation', 'data'), exist_ok=True)
+    os.makedirs(os.path.join('result', 'validation', 'triangle'), exist_ok=True)
+    os.makedirs(os.path.join('result', 'validation', 'deviation'), exist_ok=True)
+    summary_df = []
+    for i in range(len(property_labels)):
+        df = pandas.DataFrame(
+            np.vstack((test_Y[:, i], test_Y_err[:, i], means[:, i], uncertainties[:, i])).T,
+            columns=['Simulated Value', 'Simulated Uncertainty', 'Surrogate Value', 'Surrogate Uncertainty'])
+        df.to_csv(
+            os.path.join('result', 'validation', 'data', 'cross_validation_' + str(property_labels[i]) + '.csv'))
+
+        xax = [min(means[:, i]) * 0.9, max(means[:, i]) * 1.1]
+        yax = [min(means[:, i]) * 0.9, max(means[:, i]) * 1.1]
+        RMSE = np.sqrt(np.mean(np.square(means[:, i] - test_Y[:, i])))
+        avg_surrogate_uncertainty = np.mean(uncertainties[:, i])
+        print(f'LOO Cross-Validation for {property_labels[i]} surrogate:')
+        print(f'Surrogate RMSE from Simulation: {RMSE}')
+        print(f'Max Surrogate Error from Simulation: {max(abs(means[:, i] - test_Y[:, i]))}')
+        print(f'Average Surrogate Uncertainty: {avg_surrogate_uncertainty}')
+        print(f'Max Surrogate Uncertainty:{max(uncertainties[:, i])}')
+        difference = abs(means[:, i] - test_Y[:, i])
+        comb_uncert = uncertainties[:, i] * 1.96 + test_Y_err[:, i]
+        in_uncert = difference / comb_uncert < 1
+        summary_df.append(
+            [RMSE, max(abs(means[:, i] - test_Y[:, i])), avg_surrogate_uncertainty, max(uncertainties[:, i]),
+             in_uncert.sum() * 100 / len(in_uncert)])
+        plt.close()
+        plt.errorbar(means[:, i], test_Y[:, i], xerr=1.96 * uncertainties[:, i], yerr=test_Y_err[:, i], ls='none',
+                     marker='.')
+        plt.plot(xax, yax, color='k', lw=0.5)
+        plt.title(f'LOO Cross-validation for surrogate \n {property_labels[i]}')
+        plt.xlabel('Surrogate Output')
+        plt.ylabel('Simulation Value')
+        plt.savefig(
+            os.path.join('result', 'validation', 'parity', 'cross-validation_' + str(property_labels[i]) + '.png'))
+        plt.close()
+        fig, ax = plt.subplots(len(parameter_labels), len(parameter_labels), figsize=(40, 40))
+        for k in range(len(parameter_labels)):
+            for j in range(len(parameter_labels)):
+
+                if k == j:
+                    ax[k][j].scatter(test_X[:, 0, k].cpu().numpy(), test_Y[:, i], c=difference, cmap='seismic',
+                                     ls='--', marker=',')
+                elif k > j:
+                    s = ax[k][j].scatter(test_X[:, 0, k].cpu().numpy(), test_X[:, 0, j].cpu().numpy(), c=difference,
+                                         cmap='seismic', marker=',')
+                    if k == len(parameter_labels) - 1:
+                        ax[k][j].set_xlabel(parameter_labels[j])
+                    if j == 0:
+                        ax[k][j].set_ylabel(parameter_labels[k])
+                else:
+                    ax[k][j].set_visible(False)
+        fig.colorbar(s)
+        fig.suptitle('Deviation From Simulation')
+        fig.savefig(os.path.join('result', 'validation', 'deviation', str(property_labels[i]) + '.png'))
+        plt.close()
+    summary_df = np.asarray(summary_df)
+    summary_df = pandas.DataFrame(summary_df, columns=['Surrogate RMSE from Simulation', 'Max Surrogate Error',
+                                                       'Average Surrogate Uncertainty', 'Max Surrogate Uncertainty',
+                                                       '% within combined uncertainty'], index=property_labels)
+    summary_df.to_csv(os.path.join('result', 'validation', 'cross_validation_summary.csv'))
 
 def compute_surrogate_gradients(surrogate, point, eps, device):
     gradients = []
