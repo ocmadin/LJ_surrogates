@@ -6,7 +6,8 @@ import os
 import numpy as np
 import torch
 from LJ_surrogates.surrogates.surrogate import build_surrogate_lightweight, build_surrogates_loo_cv, \
-    build_surrogate_lightweight_botorch, build_multisurrogate_lightweight_botorch
+    build_surrogate_lightweight_botorch, build_multisurrogate_lightweight_botorch, \
+    build_multisurrogate_independent_botorch, build_surrogates_loo_cv_independent
 import matplotlib.pyplot as plt
 import tqdm
 import copy
@@ -138,6 +139,7 @@ class ParameterSetDataMultiplex:
                     del self.multi_data[pop]
         after = len(self.multi_data)
         print(f"Removed {before - after} datasets due to low acetic acid hvap measurments")
+
     def align_property_data(self):
         parameter_labels = []
         for parameter in self.parameters:
@@ -233,12 +235,12 @@ class ParameterSetDataMultiplex:
             num_surrogates = self.property_measurements.shape[1]
         surrogate_measurements = self.property_measurements.values.transpose()
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
-        self.multisurrogate = build_multisurrogate_lightweight_botorch(self.parameter_values.values,
+        self.multisurrogate = build_multisurrogate_independent_botorch(self.parameter_values.values,
                                                                        surrogate_measurements,
                                                                        surrogate_uncertainties, self.device)
         if do_cross_validation is True:
-            build_surrogates_loo_cv(self.parameter_values.values, surrogate_measurements,
-                                    surrogate_uncertainties, self.property_labels, self.parameter_labels)
+            build_surrogates_loo_cv_independent(self.parameter_values.values, surrogate_measurements,
+                                                surrogate_uncertainties, self.property_labels, self.parameter_labels)
 
     def evaluate_parameter_set(self, parameter_set):
 
@@ -358,8 +360,9 @@ class ParameterSetDataMultiplex:
                     hvap_estimate.append(self.property_measurements.values[i, j])
                 elif self.property_measurements.columns[j].endswith('EnthalpyOfMixing'):
                     hmix_estimate.append(self.property_measurements.values[i, j])
-                elif self.property_measurements.columns[j].endswith('Density') and '|' in self.property_measurements.columns[j]:
-                    binary_density_estimate.append(self.property_measurements.values[i,j])
+                elif self.property_measurements.columns[j].endswith('Density') and '|' in \
+                        self.property_measurements.columns[j]:
+                    binary_density_estimate.append(self.property_measurements.values[i, j])
                 elif self.property_measurements.columns[j].endswith('Density'):
                     density_estimate.append(self.property_measurements.values[i, j])
             hvap_estimate = np.asarray(hvap_estimate)
@@ -371,12 +374,11 @@ class ParameterSetDataMultiplex:
             if len(hmix_estimate) > 0:
                 hmix_rmse.append(np.sqrt(np.mean(np.square(hmix_reference - hmix_estimate))))
             if len(binary_density_estimate) > 0:
-                binary_density_rmse.append(np.sqrt(np.mean(np.square(binary_density_reference - binary_density_estimate))))
+                binary_density_rmse.append(
+                    np.sqrt(np.mean(np.square(binary_density_reference - binary_density_estimate))))
         return hvap_rmse, density_rmse, hmix_rmse, binary_density_rmse
 
-
-
-    def calculate_surrogate_simulation_deviation(self,benchmark_dataplex):
+    def calculate_surrogate_simulation_deviation(self, benchmark_dataplex):
         params = benchmark_dataplex.parameter_values.values
         prediction_values = []
         prediction_uncertainties = []
@@ -448,14 +450,13 @@ def canonicalize_dataset(dataset):
     if not isinstance(dataset, PhysicalPropertyDataSet):
         raise TypeError('Dataset must be a PhysicalPropertyDataSet object')
     ids = []
-    for i,property in enumerate(dataset.properties):
+    for i, property in enumerate(dataset.properties):
         if property.id.startswith('000'):
             dataset.properties[i].id = property.id[3:]
         elif property.id.startswith('00'):
             dataset.properties[i].id = property.id[2:]
         elif property.id.startswith('0'):
             dataset.properties[i].id = property.id[1:]
-
 
         ids.append(int(property.id, 16))
     ids = sorted(ids)
@@ -477,7 +478,7 @@ def get_simulation_data(directory):
     data = []
     for file in os.listdir(directory):
         if file.endswith('.json'):
-            data.append(BaseStoredData.from_json(os.path.join(directory,file)))
+            data.append(BaseStoredData.from_json(os.path.join(directory, file)))
     return data
 
 
@@ -498,7 +499,7 @@ def calculate_ff_rmses_surrogate(dataplex, parameter_values):
         param_vec = torch.tensor(parameter_values[i]).unsqueeze(-1).T
         surrogates.append(dataplex.multisurrogate(param_vec).mean.detach().numpy())
     surrogates = np.asarray(surrogates).squeeze()
-    surrogates = pandas.DataFrame(surrogates,columns=dataplex.property_labels)
+    surrogates = pandas.DataFrame(surrogates, columns=dataplex.property_labels)
 
     for i in range(surrogates.values.shape[0]):
         hvap_estimate = []
