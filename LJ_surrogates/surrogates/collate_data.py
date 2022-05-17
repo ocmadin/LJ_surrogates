@@ -422,7 +422,7 @@ def get_training_data_new(data, properties, parameters, device):
     # temp_labels = dataplex.property_labels[1:19]
     # temp_labels.extend(dataplex.property_labels[20:])
     # dataplex.property_labels=temp_labels
-    dataplex.build_multisurrogates(do_cross_validation=True)
+    dataplex.build_multisurrogates(do_cross_validation=False)
     # dataplex.build_surrogates(do_cross_validation=False)
     return dataplex
 
