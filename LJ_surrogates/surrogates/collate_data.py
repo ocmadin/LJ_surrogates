@@ -385,9 +385,9 @@ class ParameterSetDataMultiplex:
         for i in range(params.shape[0]):
             with gpytorch.settings.eval_cg_tolerance(1e-2) and gpytorch.settings.fast_pred_samples(
                     True) and gpytorch.settings.fast_pred_var(True):
-                eval = self.multisurrogate(torch.tensor(params[i, :]).unsqueeze(-1).T)
-            prediction_values.append(eval.mean.detach().numpy())
-            prediction_uncertainties.append(eval.variance.detach().numpy())
+                eval = self.multisurrogate.posterior(torch.tensor(params[i, :]).unsqueeze(-1).T)
+            prediction_values.append(eval.mean.T.detach().numpy())
+            prediction_uncertainties.append(torch.sqrt(eval.variance.T).detach().numpy())
         prediction_values = np.asarray(prediction_values).squeeze(2)
         prediction_uncertainties = np.asarray(prediction_uncertainties).squeeze(2)
         deviation = abs(prediction_values - benchmark_dataplex.property_measurements.values)
@@ -424,7 +424,7 @@ def get_training_data_new(data, properties, parameters, device):
     # temp_labels = dataplex.property_labels[1:19]
     # temp_labels.extend(dataplex.property_labels[20:])
     # dataplex.property_labels=temp_labels
-    dataplex.build_multisurrogates(do_cross_validation=True)
+    dataplex.build_multisurrogates(do_cross_validation=False)
     # dataplex.build_surrogates(do_cross_validation=False)
     return dataplex
 
@@ -497,7 +497,7 @@ def calculate_ff_rmses_surrogate(dataplex, parameter_values):
     surrogates = []
     for i in range(parameter_values.shape[0]):
         param_vec = torch.tensor(parameter_values[i]).unsqueeze(-1).T
-        surrogates.append(dataplex.multisurrogate(param_vec).mean.detach().numpy())
+        surrogates.append(dataplex.multisurrogate.posterior(param_vec).mean.T.detach().numpy())
     surrogates = np.asarray(surrogates).squeeze()
     surrogates = pandas.DataFrame(surrogates, columns=dataplex.property_labels)
 

@@ -16,10 +16,10 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-100-1-0-0'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/individual_surrogate_3'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
-dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection-100-1-0-0.json'
+dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
@@ -65,10 +65,10 @@ params_ncg = []
 def callbackF(objective):
     print(objective)
 
-for i in range(5):
+for i in range(1):
     # result_l_bfgs_b = minimize(objective,x0=objective.flat_parameters, jac=objective.forward_jac, bounds=bounds, method='L-BFGS-B')
     before = time.time()
-    result_de = differential_evolution(objective, bounds, popsize=20, tol=0.001, recombination=0.9)
+    result_de = differential_evolution(objective, bounds)
     after = time.time()
     print(f'DE Time: {after - before} seconds')
     objs.append(result_de.fun)
@@ -83,7 +83,7 @@ for i in range(5):
     # params_bfgs.append(result_bfgs.x)
 
 simulation_objective = objective.forward(simulation_opt)
-
+simulation_objective = objective.simulation_objective(dataplex.property_measurements.values[25])
 params_to_simulate = [simulation_opt, params[np.argmin(objs)]]
 
 create_forcefields_from_optimized_params(params_to_simulate, objective.flat_parameter_names, 'openff-1.0.0.offxml')
