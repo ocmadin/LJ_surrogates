@@ -237,8 +237,9 @@ def build_multisurrogate_independent_botorch(parameter_data, property_data, prop
     from botorch.models import FixedNoiseGP
     from botorch.fit import fit_gpytorch_model
     from botorch.models import ModelListGP
+    from gpytorch.constraints import GreaterThan
     for i in range(Y.shape[1]):
-        covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
+        covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1],lengthscale_constraint=GreaterThan(1e-8)))
 
         likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
 
