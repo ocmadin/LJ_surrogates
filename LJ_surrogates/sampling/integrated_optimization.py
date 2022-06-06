@@ -64,7 +64,8 @@ class IntegratedOptimizer:
         if include_initial_ff is True:
             os.makedirs(os.path.join(self.force_field_directory, str(n_samples + 1)))
             shutil.copy2('test-set-collection.json', os.path.join(self.force_field_directory, str(n_samples + 1)))
-            shutil.copy2(self.force_field_source, os.path.join(self.force_field_directory, str(n_samples + 1),'force-field.offxml'))
+            shutil.copy2(self.force_field_source,
+                         os.path.join(self.force_field_directory, str(n_samples + 1), 'force-field.offxml'))
 
     def prepare_single_simulation(self, params, labels):
         params = np.asarray(params)
@@ -215,9 +216,12 @@ class IntegratedOptimizer:
         density_schema = Density.default_simulation_schema(n_molecules=1000)
         h_mix_schema = EnthalpyOfMixing.default_simulation_schema(n_molecules=1000)
 
-        h_mix_schema.workflow_schema.protocol_schemas[4].protocol_schemas['production_simulation_component_$(component_replicator)'].inputs['.steps_per_iteration'] = 1000
-        h_mix_schema.workflow_schema.protocol_schemas[11].protocol_schemas['production_simulation_mixture'].inputs['.steps_per_iteration'] = 1000
-        density_schema.workflow_schema.protocol_schemas[4].protocol_schemas['production_simulation'].inputs['.steps_per_iteration'] = 1000
+        h_mix_schema.workflow_schema.protocol_schemas[4].protocol_schemas[
+            'production_simulation_component_$(component_replicator)'].inputs['.steps_per_iteration'] = 1000
+        h_mix_schema.workflow_schema.protocol_schemas[11].protocol_schemas['production_simulation_mixture'].inputs[
+            '.steps_per_iteration'] = 1000
+        density_schema.workflow_schema.protocol_schemas[4].protocol_schemas['production_simulation'].inputs[
+            '.steps_per_iteration'] = 1000
 
         # Create an options object which defines how the data set should be estimated.
         estimation_options = RequestOptions()
@@ -235,7 +239,7 @@ class IntegratedOptimizer:
             force_field_source=forcefield,
             options=estimation_options,
         )
-        self.n_simulations +=1
+        self.n_simulations += 1
         self.logger.info(
             f"Requesting a simulation of {len(property_dataset.properties)} physical properties."
             f"This is simulation #{self.n_simulations}/{self.max_simulations}"
@@ -243,13 +247,13 @@ class IntegratedOptimizer:
 
         return request
 
-    def build_physical_property_surrogate(self):
+    def build_physical_property_surrogate(self, constraint):
         from LJ_surrogates.surrogates.collate_data import collate_physical_property_data
 
         self.logger.info(f'Building a surrogate model from {self.n_simulations} physical property datasets')
 
         self.dataplex = collate_physical_property_data(self.results_directory, self.smirks, self.force_field_source,
-                                                       self.dataset_source, device='cpu')
+                                                       self.dataset_source, device='cpu', constrait=constraint)
 
     def optimize(self):
         pass
@@ -272,7 +276,7 @@ class TestOptimizer(IntegratedOptimizer):
 
             self.prepare_initial_simulations(n_samples=n_samples, smirks=self.smirks, relative_bounds=param_range)
 
-            folder_list = [str(i+1) for i in range(n_samples)]
+            folder_list = [str(i + 1) for i in range(n_samples)]
 
             self.submit_requests(folder_path=self.force_field_directory, folder_list=folder_list)
 
@@ -301,8 +305,9 @@ class TestOptimizer(IntegratedOptimizer):
                 params.append(result.x)
                 if self.n_simulations < self.max_simulations:
                     self.prepare_single_simulation(params=[result.x], labels=self.dataplex.parameter_labels)
-                    self.submit_requests(folder_path=self.force_field_directory, folder_list=[str(self.n_simulations + 1)])
-                    iter+=1
+                    self.submit_requests(folder_path=self.force_field_directory,
+                                         folder_list=[str(self.n_simulations + 1)])
+                    iter += 1
                 else:
                     break
         self.logger.info(
@@ -311,7 +316,8 @@ class TestOptimizer(IntegratedOptimizer):
 
 class SurrogateDESearchOptimizer(IntegratedOptimizer):
 
-    def optimize(self, param_range, smirks, max_simulations, initial_samples,n_workers, use_cached_data=False, cached_data_location=None):
+    def optimize(self, param_range, smirks, max_simulations, initial_samples, n_workers, use_cached_data=False,
+                 cached_data_location=None):
         from LJ_surrogates.sampling.optimize import ForceBalanceObjectiveFunction
         from scipy.optimize import differential_evolution
 
@@ -324,8 +330,8 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
 
         with self.lsf_backend:
             if use_cached_data is True:
-                shutil.copytree(cached_data_location,'estimated_results')
-                self.n_simulations += len(os.listdir('estimated_results'))/2
+                shutil.copytree(cached_data_location, 'estimated_results')
+                self.n_simulations += len(os.listdir('estimated_results')) / 2
                 os.makedirs(os.path.join('force-fields'))
                 self.force_field_directory = os.path.join('force-fields')
                 self.smirks = smirks
@@ -347,7 +353,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
             params = []
             while self.n_simulations <= self.max_simulations:
                 if iter == 0:
-                    self.build_physical_property_surrogate()
+                    self.build_physical_property_surrogate(constraint=None)
 
                 self.objective = ForceBalanceObjectiveFunction(self.dataplex.multisurrogate,
                                                                self.dataplex.properties,
@@ -371,10 +377,11 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                     maxbound = max(self.dataplex.parameter_values[column].values)
                     bounds.append((minbound, maxbound))
                 bounds_expansion_counter = 0
+                surrogate_rebuild_counter = 0
                 while bounds_expansion_counter < self.max_bounds_expansions:
                     self.bounds = np.asarray(bounds)
-                    self.bounds[:,0] /= (self.bounds_increment ** (1+bounds_expansion_counter))
-                    self.bounds[:,1] *= (self.bounds_increment ** (1+bounds_expansion_counter))
+                    self.bounds[:, 0] /= (self.bounds_increment ** (1 + bounds_expansion_counter))
+                    self.bounds[:, 1] *= (self.bounds_increment ** (1 + bounds_expansion_counter))
                     self.logger.info(
                         f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
 
@@ -395,9 +402,20 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                         break
 
                 if surrogate_result.fun >= self.solution_objective:
-                    self.logger.info(
-                            f'Surrogate search unable to find improved candidate solution. Terminating program')
-                    raise ValueError('Unable to find improved solution with surrogate.  The problem is likely ill-posed.')
+                    from gpytorch.constraints import GreaterThan
+                    if surrogate_rebuild_counter == 0:
+                        surrogate_rebuild_counter += 1
+                        self.logger.info(
+                            f'Surrogate search unable to find improved candidate solution. Rebuilding surrogate with lengthscale constraints')
+                        self.build_physical_property_surrogate(constraint=GreaterThan(1e-10))
+                    elif surrogate_rebuild_counter == 1:
+                        surrogate_rebuild_counter +=1
+                        self.logger.info(
+                            f'Surrogate search unable to find improved candidate solution. Rebuilding surrogate with stricter lengthscale constraints')
+                        self.build_physical_property_surrogate(constraint=GreaterThan(1e-5))
+                    else:
+                        self.logger.info(
+                            f'Surrogate search unable to find improved candidate solution. Terminating Program')
                 else:
                     self.logger.info(
                         f'Surrogate proposed solution has objective {surrogate_result.fun}, < current simulation objective {self.solution_objective}')
@@ -445,6 +463,5 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                         break
         self.logger.info(
             f'Optimization complete after {iter} iterations: Objective function value of {self.solution_objective} and parameters of {self.solution}')
-        np.save('parameter_vectors.npy',np.asarray(params))
-        np.save('objective_values.npy',np.asarray(objectives))
-
+        np.save('parameter_vectors.npy', np.asarray(params))
+        np.save('objective_values.npy', np.asarray(objectives))

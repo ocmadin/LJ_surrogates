@@ -225,7 +225,7 @@ def build_multisurrogate_lightweight_botorch(parameter_data, property_data, prop
     model.likelihood.eval()
     return model
 
-def build_multisurrogate_independent_botorch(parameter_data, property_data, property_uncertainties, device):
+def build_multisurrogate_independent_botorch(parameter_data, property_data, property_uncertainties, device, constraint):
     # cuda = torch.device('cuda')
     # X = torch.tensor(parameter_data).to(device=cuda)
     # Y = torch.tensor(property_data).T.to(device=cuda)
@@ -239,8 +239,8 @@ def build_multisurrogate_independent_botorch(parameter_data, property_data, prop
     from botorch.models import ModelListGP
     from gpytorch.constraints import GreaterThan
     for i in range(Y.shape[1]):
-        covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1],lengthscale_constraint=GreaterThan(1e-8)))
-
+        covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1],lengthscale_constraint=constraint))
+        # covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
         likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
 
         model = FixedNoiseGP(X, Y[:,i].unsqueeze(0).T, torch.square(Y_err)[:,i].unsqueeze(0).T, covar_module=covar_module)
