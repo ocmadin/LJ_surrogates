@@ -86,7 +86,7 @@ def run_server(n_workers, cpus_per_worker, gpus_per_worker, files_directory, por
                              working_directory=working_directory,
                              port=port,
                              enable_data_caching=False,
-                             delete_working_files=True):
+                             delete_working_files=False):
 
             requests = []
             forcefields = []
