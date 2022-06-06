@@ -14,7 +14,7 @@ import copy
 import gpytorch
 
 
-def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath, device):
+def collate_physical_property_data(directory, smirks, initial_forcefield, properties_filepath, device, constraint=None):
     data = []
     for i in range(int(len(os.listdir(directory)) / 2)):
         if os.path.isfile(os.path.join(directory, 'force_field_' + str(i + 1) + '.offxml')) and os.path.isfile(
@@ -31,7 +31,7 @@ def collate_physical_property_data(directory, smirks, initial_forcefield, proper
     initial_forcefield = ForceField(initial_forcefield)
     initial_parameters = get_force_field_parameters(initial_forcefield, smirks)
     properties = PhysicalPropertyDataSet.from_json(properties_filepath)
-    dataplex = get_training_data_new(data, properties, initial_parameters, device)
+    dataplex = get_training_data_new(data, properties, initial_parameters, device, constraint)
     # dataplex.plot_properties()
     # properties_all = get_training_data(data)
     return dataplex
@@ -227,7 +227,7 @@ class ParameterSetDataMultiplex:
         self.surrogates = surrogates
         self.botorch_surrogates = botorch_surrogates
 
-    def build_multisurrogates(self, do_cross_validation=False):
+    def build_multisurrogates(self, do_cross_validation=False, constraint=None):
 
         if self.property_measurements.shape[0] != self.parameter_values.shape[0]:
             raise ValueError('Number of Parameter Sets and Measurement Sets must agree!')
@@ -237,7 +237,7 @@ class ParameterSetDataMultiplex:
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
         self.multisurrogate = build_multisurrogate_independent_botorch(self.parameter_values.values,
                                                                        surrogate_measurements,
-                                                                       surrogate_uncertainties, self.device)
+                                                                       surrogate_uncertainties, self.device, constraint=None)
         if do_cross_validation is True:
             build_surrogates_loo_cv_independent(self.parameter_values.values, surrogate_measurements,
                                                 surrogate_uncertainties, self.property_labels, self.parameter_labels)
@@ -397,7 +397,7 @@ class ParameterSetDataMultiplex:
         return deviation, percent_deviation, comb_uncert, in_uncert
 
 
-def get_training_data_new(data, properties, parameters, device):
+def get_training_data_new(data, properties, parameters, device, constraint=None):
     data_list = []
     for datum in data:
         data_list.append(ParameterSetData(datum))
@@ -424,7 +424,7 @@ def get_training_data_new(data, properties, parameters, device):
     # temp_labels = dataplex.property_labels[1:19]
     # temp_labels.extend(dataplex.property_labels[20:])
     # dataplex.property_labels=temp_labels
-    dataplex.build_multisurrogates(do_cross_validation=False)
+    dataplex.build_multisurrogates(do_cross_validation=False, constraint = constraint)
     # dataplex.build_surrogates(do_cross_validation=False)
     return dataplex
 
