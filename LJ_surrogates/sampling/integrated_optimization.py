@@ -249,7 +249,7 @@ class IntegratedOptimizer:
         self.logger.info(f'Building a surrogate model from {self.n_simulations} physical property datasets')
 
         self.dataplex = collate_physical_property_data(self.results_directory, self.smirks, self.force_field_source,
-                                                       self.dataset_source, device='cpu', constrait=constraint)
+                                                       self.dataset_source, device='cpu', constraint=constraint)
 
     def optimize(self):
         pass
@@ -421,7 +421,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                                                        labels=self.dataplex.parameter_labels)
                         self.submit_requests(folder_path=self.force_field_directory,
                                              folder_list=[str(self.n_simulations + 1)])
-                        self.build_physical_property_surrogate()
+                        self.build_physical_property_surrogate(constraint=None)
                         for i in range(self.dataplex.parameter_values.shape[0]):
                             if np.allclose(self.dataplex.parameter_values.values[i], surrogate_result.x):
                                 simulation_objective = self.objective.simulation_objective(
