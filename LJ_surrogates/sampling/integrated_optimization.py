@@ -346,6 +346,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
             iter = 0
             objectives = []
             params = []
+            surrogate_rebuild_counter = 0
             while self.n_simulations <= self.max_simulations:
                 if iter == 0:
                     self.build_physical_property_surrogate(constraint=None)
@@ -372,7 +373,6 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                     maxbound = max(self.dataplex.parameter_values[column].values)
                     bounds.append((minbound, maxbound))
                 bounds_expansion_counter = 0
-                surrogate_rebuild_counter = 0
                 while bounds_expansion_counter < self.max_bounds_expansions:
                     self.bounds = np.asarray(bounds)
                     self.bounds[:, 0] /= (self.bounds_increment ** (1 + bounds_expansion_counter))
@@ -421,6 +421,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                                                        labels=self.dataplex.parameter_labels)
                         self.submit_requests(folder_path=self.force_field_directory,
                                              folder_list=[str(self.n_simulations + 1)])
+                        surrogate_rebuild_counter = 0
                         self.build_physical_property_surrogate(constraint=None)
                         for i in range(self.dataplex.parameter_values.shape[0]):
                             if np.allclose(self.dataplex.parameter_values.values[i], surrogate_result.x):
