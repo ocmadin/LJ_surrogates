@@ -411,6 +411,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                     else:
                         self.logger.info(
                             f'Surrogate search unable to find improved candidate solution. Terminating Program')
+                        raise ValueError("Unable to find improved solution")
                 else:
                     self.logger.info(
                         f'Surrogate proposed solution has objective {surrogate_result.fun}, < current simulation objective {self.solution_objective}')
