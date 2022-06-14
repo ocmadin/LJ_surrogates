@@ -11,19 +11,20 @@ import textwrap
 import seaborn
 import os
 from LJ_surrogates.plotting.plotting import plot_triangle
+from gpytorch.constraints import GreaterThan
 import time
 
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/phase-separation-test-2'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/new-run-constraints'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
-dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/phase-separation-test/phase-separation-test.json'
+dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
-                                          dataset_json, device)
+                                          dataset_json, device, constraint=GreaterThan(1e-5))
 
 # objective = ConstrainedGaussianObjectiveFunctionNoSurrogate(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters, 0.001)
 # objective = ConstrainedGaussianObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
@@ -82,17 +83,11 @@ for i in range(1):
     # objs_bfgs.append(result_bfgs.fun)
     # params_bfgs.append(result_bfgs.x)
 
-simulation_objective = objective.forward(simulation_opt)
-simulation_objective = objective.simulation_objective(dataplex.property_measurements.values[25])
-params_to_simulate = [simulation_opt, params[np.argmin(objs)]]
+lengthscales = []
 
-create_forcefields_from_optimized_params(params_to_simulate, objective.flat_parameter_names, 'openff-1.0.0.offxml')
+for model in dataplex.multisurrogate.models:
+    lengthscales.append(model.covar_module.base_kernel.lengthscale)
 
-params_to_simulate.append(objective.flat_parameters)
-
-params_to_simulate = np.asarray(params_to_simulate)
+lengthscales = torch.stack(lengthscales)
 
 
-new_bounds = [(params_to_simulate[1][i]-0.1*boundsrange[i],params_to_simulate[1][i] + 0.1*boundsrange[i]) for i,param in enumerate(params_to_simulate[1])]
-
-hvap_rmse, density_rmse = calculate_ff_rmses_surrogate(dataplex, params_to_simulate)

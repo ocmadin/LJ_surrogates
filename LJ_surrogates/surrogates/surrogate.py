@@ -225,7 +225,7 @@ def build_multisurrogate_lightweight_botorch(parameter_data, property_data, prop
     model.likelihood.eval()
     return model
 
-def build_multisurrogate_independent_botorch(parameter_data, property_data, property_uncertainties, device, constraint):
+def build_multisurrogate_independent_botorch(parameter_data, property_data, property_uncertainties, device, constraint=None):
     # cuda = torch.device('cuda')
     # X = torch.tensor(parameter_data).to(device=cuda)
     # Y = torch.tensor(property_data).T.to(device=cuda)

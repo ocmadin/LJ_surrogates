@@ -237,7 +237,7 @@ class ParameterSetDataMultiplex:
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
         self.multisurrogate = build_multisurrogate_independent_botorch(self.parameter_values.values,
                                                                        surrogate_measurements,
-                                                                       surrogate_uncertainties, self.device, constraint=None)
+                                                                       surrogate_uncertainties, self.device, constraint=constraint)
         if do_cross_validation is True:
             build_surrogates_loo_cv_independent(self.parameter_values.values, surrogate_measurements,
                                                 surrogate_uncertainties, self.property_labels, self.parameter_labels)
