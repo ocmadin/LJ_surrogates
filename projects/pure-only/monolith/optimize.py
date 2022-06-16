@@ -17,14 +17,14 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/new-run-constraints'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/individual_surrogate_2'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
-                                          dataset_json, device, constraint=GreaterThan(1e-5))
+                                          dataset_json, device, constraint=GreaterThan(1e-10))
 
 # objective = ConstrainedGaussianObjectiveFunctionNoSurrogate(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters, 0.001)
 # objective = ConstrainedGaussianObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
@@ -88,6 +88,14 @@ lengthscales = []
 for model in dataplex.multisurrogate.models:
     lengthscales.append(model.covar_module.base_kernel.lengthscale)
 
-lengthscales = torch.stack(lengthscales)
+lengthscales = torch.stack(lengthscales).squeeze(1).detach().numpy()
+
+experimental_values = []
+for property in dataplex.properties.properties:
+    experimental_values.append(property.value.m)
+experimental_values = np.asarray(experimental_values)
+
+surrogate_values = dataplex.multisurrogate.posterior(torch.tensor(params[0]).unsqueeze(0)).mean.detach().numpy().squeeze()
+
 
 

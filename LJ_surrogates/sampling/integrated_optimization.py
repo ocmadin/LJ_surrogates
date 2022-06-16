@@ -321,7 +321,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
         self.eta_1 = 0.01
         self.eta_2 = 0.5
         self.bounds_increment = 1.1
-        self.max_bounds_expansions = 3
+        self.max_bounds_expansions = 1
         self.setup_server(n_workers=n_workers, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
 
         with self.lsf_backend:
@@ -372,31 +372,22 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                     minbound = min(self.dataplex.parameter_values[column].values)
                     maxbound = max(self.dataplex.parameter_values[column].values)
                     bounds.append((minbound, maxbound))
-                bounds_expansion_counter = 0
-                while bounds_expansion_counter < self.max_bounds_expansions:
                     self.bounds = np.asarray(bounds)
-                    self.bounds[:, 0] /= (self.bounds_increment ** (1 + bounds_expansion_counter))
-                    self.bounds[:, 1] *= (self.bounds_increment ** (1 + bounds_expansion_counter))
-                    self.logger.info(
-                        f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
+                self.bounds[:, 0] /= (self.bounds_increment ** (1))
+                self.bounds[:, 1] *= (self.bounds_increment ** (1))
+                self.logger.info(
+                    f'Optimization Iteration {iter}: Initial Solution of {self.solution} with simulation objective of {self.solution_objective}')
 
-                    self.logger.info(
-                        f'Optimization Iteration {iter}: optimizing over a surrogate built from {self.n_simulations} datasets')
+                self.logger.info(
+                    f'Optimization Iteration {iter}: optimizing over a surrogate built from {self.n_simulations} datasets')
 
-                    surrogate_result = differential_evolution(self.objective, self.bounds)
-                    self.logger.info(
-                        f'Surrogate proposes solution with surrogate objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
-                    predicted_reduction = self.solution_objective - surrogate_result.fun
-                    if surrogate_result.fun >= self.solution_objective:
-                        self.logger.info(
-                            f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
-                        self.logger.info(
-                            f'Proposed solution discarded and search space increased')
-                        bounds_expansion_counter += 1
-                    else:
-                        break
-
+                surrogate_result = differential_evolution(self.objective, self.bounds)
+                self.logger.info(
+                    f'Surrogate proposes solution with surrogate objective function value of {surrogate_result.fun} and parameters of {surrogate_result.x}')
+                predicted_reduction = self.solution_objective - surrogate_result.fun
                 if surrogate_result.fun >= self.solution_objective:
+                    self.logger.info(
+                        f'Surrogate proposed solution has objective {surrogate_result.fun}, >= current simulation objective {self.solution_objective}')
                     from gpytorch.constraints import GreaterThan
                     if surrogate_rebuild_counter == 0:
                         surrogate_rebuild_counter += 1
@@ -404,7 +395,7 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                             f'Surrogate search unable to find improved candidate solution. Rebuilding surrogate with lengthscale constraints')
                         self.build_physical_property_surrogate(constraint=GreaterThan(1e-10))
                     elif surrogate_rebuild_counter == 1:
-                        surrogate_rebuild_counter +=1
+                        surrogate_rebuild_counter += 1
                         self.logger.info(
                             f'Surrogate search unable to find improved candidate solution. Rebuilding surrogate with stricter lengthscale constraints')
                         self.build_physical_property_surrogate(constraint=GreaterThan(1e-5))
