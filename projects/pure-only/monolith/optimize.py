@@ -17,7 +17,7 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/individual_surrogate_2'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/individual_surrogate_3'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection.json'
@@ -46,6 +46,10 @@ for column in dataplex.parameter_values.columns:
     minbound = min(dataplex.parameter_values[column].values)
     maxbound = max(dataplex.parameter_values[column].values)
     bounds.append((minbound, maxbound))
+bounds = np.asarray(bounds)
+bounds_increment = 1.1
+bounds[:, 0] /= (bounds_increment ** (1))
+bounds[:, 1] *= (bounds_increment ** (1))
 
 # bounds = [(0.004, 0.025), (1.0, 2), (0.05, 0.2), (1.5, 3), (0.05, 0.2), (1.5, 2.5), (0.15, 0.30), (1.2, 2.0), (0.1, 0.25), (1.2, 2.5), (0.1, 0.5), (1.2, 2.5)]
 

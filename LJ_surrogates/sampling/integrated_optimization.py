@@ -347,9 +347,10 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
             objectives = []
             params = []
             surrogate_rebuild_counter = 0
+            constraint = None
             while self.n_simulations <= self.max_simulations:
                 if iter == 0:
-                    self.build_physical_property_surrogate(constraint=None)
+                    self.build_physical_property_surrogate(constraint=constraint)
 
                 self.objective = ForceBalanceObjectiveFunction(self.dataplex.multisurrogate,
                                                                self.dataplex.properties,
@@ -391,15 +392,18 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                     from gpytorch.constraints import GreaterThan
                     if surrogate_rebuild_counter == 0:
                         surrogate_rebuild_counter += 1
+                        iter += 1
                         self.logger.info(
                             f'Surrogate search unable to find improved candidate solution. Rebuilding surrogate with lengthscale constraints')
-                        self.build_physical_property_surrogate(constraint=GreaterThan(1e-10))
+                        constraint = GreaterThan(1e-10)
                     elif surrogate_rebuild_counter == 1:
                         surrogate_rebuild_counter += 1
+                        iter += 1
                         self.logger.info(
                             f'Surrogate search unable to find improved candidate solution. Rebuilding surrogate with stricter lengthscale constraints')
-                        self.build_physical_property_surrogate(constraint=GreaterThan(1e-5))
+                        constraint = GreaterThan(1e-5)
                     else:
+                        iter += 1
                         self.logger.info(
                             f'Surrogate search unable to find improved candidate solution. Terminating Program')
                         raise ValueError("Unable to find improved solution")
@@ -414,7 +418,8 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                         self.submit_requests(folder_path=self.force_field_directory,
                                              folder_list=[str(self.n_simulations + 1)])
                         surrogate_rebuild_counter = 0
-                        self.build_physical_property_surrogate(constraint=None)
+                        constraint = None
+                        self.build_physical_property_surrogate(constraint=constraint)
                         for i in range(self.dataplex.parameter_values.shape[0]):
                             if np.allclose(self.dataplex.parameter_values.values[i], surrogate_result.x):
                                 simulation_objective = self.objective.simulation_objective(
