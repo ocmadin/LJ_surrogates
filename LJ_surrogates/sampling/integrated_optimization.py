@@ -324,10 +324,21 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
         self.max_bounds_expansions = 1
         self.setup_server(n_workers=n_workers, cpus_per_worker=1, gpus_per_worker=1, port=self.port)
 
+        if os.path.exists('estimated_results'):
+            os.removedirs('estimated_results')
+        if os.path.exists('working_directory'):
+            os.removedirs('working_directory')
+        if os.path.exists('force-fields'):
+            os.removedirs('force-fields')
+        if os.path.exists('stored_data'):
+            os.removedirs('stored_data')
+
+
         with self.lsf_backend:
             self.smirks = smirks
             self.param_range = param_range
             if use_cached_data is True:
+
                 shutil.copytree(cached_data_location,'estimated_results')
                 self.n_simulations += int(len(os.listdir('estimated_results'))/2)
                 self.results_directory = 'estimated_results'
@@ -368,6 +379,8 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                                 self.dataplex.property_measurements.values[i])
                             simulation_objective = self.solution_objective
                             break
+                if constraint is not None:
+                    self.build_physical_property_surrogate(constraint=constraint)
                 bounds = []
                 for column in self.dataplex.parameter_values.columns:
                     minbound = min(self.dataplex.parameter_values[column].values)
