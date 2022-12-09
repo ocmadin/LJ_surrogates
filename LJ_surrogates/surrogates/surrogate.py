@@ -243,7 +243,7 @@ def build_multisurrogate_independent_botorch(parameter_data, property_data, prop
         # covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=X.shape[1]))
         likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=torch.square(Y_err))
 
-        model = FixedNoiseGP(X, Y[:,i].unsqueeze(0).T, torch.square(Y_err)[:,i].unsqueeze(0).T, covar_module=covar_module)
+        model = FixedNoiseGP(X, Y[:,i].unsqueeze(0).T, torch.square(Y_err)[:,i].unsqueeze(0).T, covar_module=covar_module, jitter=1e-4)
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
         fit_gpytorch_model(mll)
         model.eval()

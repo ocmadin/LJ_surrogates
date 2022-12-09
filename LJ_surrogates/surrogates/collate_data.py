@@ -8,6 +8,7 @@ import torch
 from LJ_surrogates.surrogates.surrogate import build_surrogate_lightweight, build_surrogates_loo_cv, \
     build_surrogate_lightweight_botorch, build_multisurrogate_lightweight_botorch, \
     build_multisurrogate_independent_botorch, build_surrogates_loo_cv_independent
+from LJ_surrogates.analysis.analysis import calculate_bootstrapped_rmse
 import matplotlib.pyplot as plt
 import tqdm
 import copy
@@ -237,7 +238,8 @@ class ParameterSetDataMultiplex:
         surrogate_uncertainties = self.property_uncertainties.values.transpose()
         self.multisurrogate = build_multisurrogate_independent_botorch(self.parameter_values.values,
                                                                        surrogate_measurements,
-                                                                       surrogate_uncertainties, self.device, constraint=constraint)
+                                                                       surrogate_uncertainties, self.device,
+                                                                       constraint=constraint)
         if do_cross_validation is True:
             build_surrogates_loo_cv_independent(self.parameter_values.values, surrogate_measurements,
                                                 surrogate_uncertainties, self.property_labels, self.parameter_labels)
@@ -368,14 +370,14 @@ class ParameterSetDataMultiplex:
             hvap_estimate = np.asarray(hvap_estimate)
             density_estimate = np.asarray(density_estimate)
             if len(hvap_estimate) > 0:
-                hvap_rmse.append(np.sqrt(np.mean(np.square(hvap_reference - hvap_estimate))))
+                hvap_rmse.append(calculate_bootstrapped_rmse(hvap_estimate - hvap_reference))
             if len(density_estimate) > 0:
-                density_rmse.append(np.sqrt(np.mean(np.square(density_reference - density_estimate))))
+                density_rmse.append(calculate_bootstrapped_rmse(density_reference - density_estimate))
             if len(hmix_estimate) > 0:
-                hmix_rmse.append(np.sqrt(np.mean(np.square(hmix_reference - hmix_estimate))))
+                hmix_rmse.append(calculate_bootstrapped_rmse(hmix_estimate - hmix_reference))
             if len(binary_density_estimate) > 0:
                 binary_density_rmse.append(
-                    np.sqrt(np.mean(np.square(binary_density_reference - binary_density_estimate))))
+                    calculate_bootstrapped_rmse(binary_density_reference - binary_density_estimate))
         return hvap_rmse, density_rmse, hmix_rmse, binary_density_rmse
 
     def calculate_surrogate_simulation_deviation(self, benchmark_dataplex):
@@ -424,7 +426,7 @@ def get_training_data_new(data, properties, parameters, device, constraint=None)
     # temp_labels = dataplex.property_labels[1:19]
     # temp_labels.extend(dataplex.property_labels[20:])
     # dataplex.property_labels=temp_labels
-    dataplex.build_multisurrogates(do_cross_validation=False, constraint = constraint)
+    dataplex.build_multisurrogates(do_cross_validation=False, constraint=constraint)
     # dataplex.build_surrogates(do_cross_validation=False)
     return dataplex
 
@@ -511,6 +513,10 @@ def calculate_ff_rmses_surrogate(dataplex, parameter_values):
                 density_estimate.append(surrogates.values[i, j])
         hvap_estimate = np.asarray(hvap_estimate)
         density_estimate = np.asarray(density_estimate)
-        hvap_rmse.append(np.mean(np.sqrt(np.square(hvap_reference - hvap_estimate))))
+        hvap_vec = hvap_estimate - hvap_reference
+        density_vec = density_estimate - density_reference
+        hvap_rmse.append(calculate_bootstrapped_rmse(hvap_vec))
+        density_rmse.append(calculate_bootstrapped_rmse(density_vec))
         density_rmse.append(np.mean(np.sqrt(np.square(density_reference - density_estimate))))
     return hvap_rmse, density_rmse
+

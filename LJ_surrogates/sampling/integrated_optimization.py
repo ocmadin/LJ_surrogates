@@ -419,6 +419,8 @@ class SurrogateDESearchOptimizer(IntegratedOptimizer):
                         iter += 1
                         self.logger.info(
                             f'Surrogate search unable to find improved candidate solution. Terminating Program')
+                        np.save('parameter_vectors.npy', np.asarray(params))
+                        np.save('objective_values.npy', np.asarray(objectives))
                         raise ValueError("Unable to find improved solution")
                 else:
                     self.logger.info(

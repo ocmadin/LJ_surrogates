@@ -17,32 +17,12 @@ class SimulatedDataset:
             ChemicalEnvironment.Alkane,
             ChemicalEnvironment.Alkene,
             ChemicalEnvironment.Alcohol,
-            ChemicalEnvironment.CarbonylHydrate,
-            ChemicalEnvironment.Hemiacetal,
-            ChemicalEnvironment.Acetal,
-            ChemicalEnvironment.Hemiaminal,
-            ChemicalEnvironment.Aminal,
-            ChemicalEnvironment.Thioacetal,
             ChemicalEnvironment.CarboxylicAcidEster,
             ChemicalEnvironment.Ether,
             ChemicalEnvironment.Aldehyde,
             ChemicalEnvironment.Ketone,
-            ChemicalEnvironment.Aromatic,
-            ChemicalEnvironment.CarboxylicAcidPrimaryAmide,
-            ChemicalEnvironment.CarboxylicAcidSecondaryAmide,
-            ChemicalEnvironment.CarboxylicAcidTertiaryAmide,
-            ChemicalEnvironment.PrimaryAmine,
-            ChemicalEnvironment.SecondaryAmine,
-            ChemicalEnvironment.TertiaryAmine,
-            ChemicalEnvironment.Cyanate,
-            ChemicalEnvironment.Isocyanate,
-            ChemicalEnvironment.Heterocycle,
-            ChemicalEnvironment.AlkylFluoride,
-            ChemicalEnvironment.ArylFluoride,
-            ChemicalEnvironment.AlkylChloride,
-            ChemicalEnvironment.ArylChloride,
-            ChemicalEnvironment.AlkylBromide,
-            ChemicalEnvironment.ArylBromide,
+            # ChemicalEnvironment.Aromatic,
+            # ChemicalEnvironment.Heterocycle,
             ChemicalEnvironment.Aqueous,
             ChemicalEnvironment.CarboxylicAcid
         ]
@@ -131,11 +111,23 @@ class SimulatedDataset:
         rmses = []
         for dataframe in dataframes:
             if dataframe.shape[0] > 0:
-                rmse = np.sqrt(np.mean(np.square(dataframe['Reference Value'] - dataframe['Estimated Value'])))
+                rmse = calculate_bootstrapped_rmse((dataframe['Reference Value'] - dataframe['Estimated Value']))
             else:
                 rmse = np.nan
             rmses.append(rmse)
         return rmses
+
+    def calculate_mses(self):
+        dataframes = [self.enthalpy_of_vaporization, self.enthalpy_of_mixing, self.pure_density, self.binary_density]
+
+        mses = []
+        for dataframe in dataframes:
+            if dataframe.shape[0] > 0:
+                mse = calculate_bootstrapped_mse((dataframe['Estimated Value'] - dataframe['Reference Value']))
+            else:
+                mse = np.nan
+            mses.append(mse)
+        return mses
 
     def calculate_rmse_by_category(self, dataframe):
         categories = set(dataframe['Category 1'].dropna()).union(set(dataframe['Category 2'].dropna()))
@@ -147,9 +139,27 @@ class SimulatedDataset:
             cat_df["multiple"] = (dataframe[cols] == category).any(axis="columns")
 
             cat_df = cat_df[cat_df['multiple'] == True]
-            rmses[category] = np.sqrt(np.mean(np.square(cat_df['Reference Value'] - cat_df['Estimated Value'])))
+            rmses[category] = calculate_bootstrapped_rmse(cat_df['Reference Value'] - cat_df['Estimated Value'])
 
         return rmses
+
+    def calculate_mse_by_category(self, dataframe):
+        categories = set(dataframe['Category 1'].dropna()).union(set(dataframe['Category 2'].dropna()))
+
+        mses = {}
+        for category in categories:
+            cols = ['Category 1', 'Category 2']
+            cat_df = copy.deepcopy(dataframe)
+            cat_df["multiple"] = (dataframe[cols] == category).any(axis="columns")
+
+            cat_df = cat_df[cat_df['multiple'] == True]
+            mses[category] = calculate_bootstrapped_mse(cat_df['Estimated Value'] - cat_df['Reference Value'])
+
+        return mses
+
+    def remove_problematic_points(self):
+        self.df = self.df[(self.df['Component 1'] != 'CC(=O)CC(C)C') & (self.df['Component 2'] != 'CCCCCCO')]
+        # self.df = self.df[(self.df['Property Type'] != 'openff.evaluator.properties.enthalpy.EnthalpyOfVaporization' & self.df['Category 1'] != 'Carboxylic Acid')]
 
     def plot_parity(self, dataframe, property, category):
         rmse = np.sqrt(np.mean(np.square(dataframe['Reference Value'] - dataframe['Estimated Value'])))
@@ -224,3 +234,108 @@ class SimulatedDataset:
             self.plot_category_parities(self.pure_density,'Pure Density')
         if self.binary_density.shape[0] > 0:
             self.plot_category_parities(self.binary_density,'Binary Density')
+
+def calculate_bootstrapped_rmse(rmse_vec, bootstrap_iterations=1000, percentile=0.95):
+    rmse = np.sqrt(np.mean(np.square(rmse_vec)))
+
+    sample_statistics = np.zeros(bootstrap_iterations)
+
+    sample_count = len(rmse_vec)
+
+    for sample_index in range(bootstrap_iterations):
+        samples_indices = np.random.randint(
+            low=0, high=sample_count, size=sample_count
+        )
+
+        resampled_error_vec = rmse_vec[samples_indices]
+
+        rmse_sample = np.sqrt(np.mean(np.square(resampled_error_vec)))
+
+        sample_statistics[sample_index] = np.asarray(rmse_sample)
+
+    sorted_samples = np.sort(sample_statistics)
+
+    # Compute the confidence intervals.
+    lower_percentile_index = int(bootstrap_iterations * (1 - percentile) / 2)
+    upper_percentile_index = int(bootstrap_iterations * (1 + percentile) / 2)
+
+    confidence_interval = (
+        sorted_samples[lower_percentile_index],
+        sorted_samples[upper_percentile_index],
+    )
+
+    return {'RMSE': rmse, 'CI': confidence_interval}
+
+
+def calculate_bootstrapped_mse(mse_vec, bootstrap_iterations=1000, percentile=0.95):
+    mse = np.mean(mse_vec)
+
+    sample_statistics = np.zeros(bootstrap_iterations)
+
+    sample_count = len(mse_vec)
+
+    for sample_index in range(bootstrap_iterations):
+        samples_indices = np.random.randint(
+            low=0, high=sample_count, size=sample_count
+        )
+
+        resampled_error_vec = mse_vec[samples_indices]
+
+        mse_sample = np.mean(resampled_error_vec)
+
+        sample_statistics[sample_index] = np.asarray(mse_sample)
+
+    sorted_samples = np.sort(sample_statistics)
+
+    # Compute the confidence intervals.
+    lower_percentile_index = int(bootstrap_iterations * (1 - percentile) / 2)
+    upper_percentile_index = int(bootstrap_iterations * (1 + percentile) / 2)
+
+    confidence_interval = (
+        sorted_samples[lower_percentile_index],
+        sorted_samples[upper_percentile_index],
+    )
+
+    return {'MSE': mse, 'CI': confidence_interval}
+
+def unzip_rmse_dict(dict):
+    labels = []
+    rmses = []
+    ci_low = []
+    ci_high = []
+    for key in dict.keys():
+        if 'Carboxylic Acid Ester' in key:
+            label = key.replace('Carboxylic Acid Ester', 'Ester')
+            labels.append(label)
+        else:
+            labels.append(key)
+        rmses.append(dict[key]['RMSE'])
+        ci_low.append(dict[key]['CI'][0])
+        ci_high.append(dict[key]['CI'][1])
+
+    rmses = np.asarray(rmses)
+    ci_low = np.asarray(ci_low)
+    ci_high = np.asarray(ci_high)
+    errbar = np.vstack([rmses-ci_low, ci_high-rmses])
+    return rmses, labels, errbar
+
+def unzip_mse_dict(dict):
+    labels = []
+    mses = []
+    ci_low = []
+    ci_high = []
+    for key in dict.keys():
+        if 'Carboxylic Acid Ester' in key:
+            label = key.replace('Carboxylic Acid Ester', 'Ester')
+            labels.append(label)
+        else:
+            labels.append(key)
+        mses.append(dict[key]['MSE'])
+        ci_low.append(dict[key]['CI'][0])
+        ci_high.append(dict[key]['CI'][1])
+
+    mses = np.asarray(mses)
+    ci_low = np.asarray(ci_low)
+    ci_high = np.asarray(ci_high)
+    errbar = np.vstack([mses-ci_low, ci_high-mses])
+    return mses, labels, errbar

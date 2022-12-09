@@ -17,14 +17,14 @@ import time
 gc.collect()
 torch.cuda.empty_cache()
 device = torch.device('cuda')
-path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/individual_surrogate_3'
+path = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/pure-only-pooled'
 smirks_types_to_change = ['[#1:1]-[#6X4]', '[#6:1]', '[#6X4:1]', '[#8:1]', '[#8X2H0+0:1]', '[#8X2H1+0:1]']
 forcefield = 'openff-1.0.0.offxml'
 dataset_json = '/home/owenmadin/storage/LINCOLN1/surrogate_modeling/pure-only/test-set-collection.json'
 device = 'cpu'
 
 dataplex = collate_physical_property_data(path, smirks_types_to_change, forcefield,
-                                          dataset_json, device, constraint=GreaterThan(1e-10))
+                                          dataset_json, device, constraint=None)
 
 # objective = ConstrainedGaussianObjectiveFunctionNoSurrogate(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters, 0.001)
 # objective = ConstrainedGaussianObjectiveFunction(dataplex.multisurrogate, dataplex.properties, dataplex.initial_parameters,
@@ -94,12 +94,65 @@ for model in dataplex.multisurrogate.models:
 
 lengthscales = torch.stack(lengthscales).squeeze(1).detach().numpy()
 
+
+objectives = []
+for i in range(dataplex.property_measurements.values.shape[0]):
+    objectives.append(objective.simulation_objective(dataplex.property_measurements.values[i]))
+
+
+new_df = dataplex.parameter_values
+new_df['objective'] = np.asarray(objectives)
+new_df.to_csv('../../mixture-only/df_10.csv')
 experimental_values = []
-for property in dataplex.properties.properties:
+# cl_indices = []
+# br_indices = []
+# clbr_indices = []
+for i,property in enumerate(dataplex.properties.properties):
     experimental_values.append(property.value.m)
+    # if 'Cl' in property.substance.identifier and 'Br' not in property.substance.identifier:
+    #     cl_indices.append(i)
+    # if 'Br' in property.substance.identifier and 'Cl' not in property.substance.identifier:
+    #     br_indices.append(i)
+    # if 'Cl' in property.substance.identifier and 'Br'  in property.substance.identifier:
+    #     clbr_indices.append(i)
+
 experimental_values = np.asarray(experimental_values)
 
-surrogate_values = dataplex.multisurrogate.posterior(torch.tensor(params[0]).unsqueeze(0)).mean.detach().numpy().squeeze()
+# cl_experimental_values = experimental_values[cl_indices]
+# cl_experimental_values = np.append(cl_experimental_values, [1.487, 1.594])
+# cl_openff_1_0_0_values = np.append(dataplex.property_measurements.values[0][cl_indices], [1.4489, 1.58979])
+# cl_openff_2_0_0_values = np.append(dataplex.property_measurements.values[1][cl_indices], [1.585, 1.742])
+#
+# br_experimental_values = np.append(experimental_values[br_indices], 2.878)
+# br_openff_1_0_0_values = np.append(dataplex.property_measurements.values[0][br_indices], 2.247)
+# br_openff_2_0_0_values = np.append(dataplex.property_measurements.values[1][br_indices], 2.779)
+#
+# clbr_experimental_values = experimental_values[clbr_indices]
+# clbr_openff_1_0_0_values = dataplex.property_measurements.values[0][clbr_indices]
+# clbr_openff_2_0_0_values = dataplex.property_measurements.values[1][clbr_indices]
+#
+# surrogate_values = dataplex.multisurrogate.posterior(torch.tensor(params[0]).unsqueeze(0)).mean.detach().numpy().squeeze()
+#
+# plt.scatter(cl_experimental_values, cl_openff_1_0_0_values, color='b', marker='x', label='Cl Only, OpenFF 1.0.0')
+# plt.scatter(cl_experimental_values, cl_openff_2_0_0_values, color='orange', marker='x', label='Cl Only, OpenFF 2.0.0')
+#
+# plt.scatter(br_experimental_values, br_openff_1_0_0_values, color='b', marker='o', facecolor='none', label='Br Only, OpenFF 1.0.0')
+# plt.scatter(br_experimental_values, br_openff_2_0_0_values, color='orange', marker='o', facecolor='none', label='Br Only, OpenFF 2.0.0')
+#
+# plt.scatter(clbr_experimental_values, clbr_openff_1_0_0_values, color='b', marker='s', facecolor='none', label='Cl + Br, OpenFF 1.0.0')
+# plt.scatter(clbr_experimental_values, clbr_openff_2_0_0_values, color='orange', marker='s', facecolor='none', label='Cl + Br, OpenFF 2.0.0')
+#
+# plt.plot([0.75,3.0],[0.75,3.0], color='k')
+# plt.text(1.45, 1.55, r'CHCl$_3$', horizontalalignment='right')
+# plt.text(1.55, 1.75, r'CCl$_4$', horizontalalignment='right')
+# plt.text(1.4, 1.45, r'C$_2$H$_3$Cl$_3$', horizontalalignment='right')
+# plt.xlim([0.75,3.0])
+# plt.ylim([0.75,3.0])
+# plt.xlabel('Experimental Density, g/ml')
+# plt.ylabel('Simulation Density, g/ml')
+# plt.title('Density of Halogenated Alkanes')
+# plt.legend()
+# plt.tight_layout()
+# plt.show()
 
-
-
+# compare_df = dataplex.property_measurements.loc[dataplex.property_measurements.shape[0]]

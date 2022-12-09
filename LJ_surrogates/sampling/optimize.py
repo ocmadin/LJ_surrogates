@@ -198,11 +198,13 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
             surrogates_hmix = surrogate_predictions[self.hmix_labels]
             obj_hmix_jacobian = -2 / (surrogates_hmix.shape[0] * self.hmix_denominator) * torch.sum(
                 ((self.hmix_measurements - surrogates_hmix) / self.hmix_denominator) * jacobian_hmix, axis=0)
+        else:
+            obj_hmix_jacobian = torch.zeros(obj_density_jacobian.shape)
 
         objective_jacobian = obj_density_jacobian + obj_hvap_jacobian + obj_hmix_jacobian
         return objective_jacobian.detach().numpy()
 
-    def simulation_objective(self, simulation_outputs):
+    def simulation_objective(self, simulation_outputs, debug=False):
 
         if len(self.density_measurements) > 0:
             simulation_density = torch.tensor(simulation_outputs[self.density_labels]).unsqueeze(-1)
@@ -221,9 +223,12 @@ class ForceBalanceObjectiveFunction(ObjectiveFunction):
             hmix_objective = (1 / simulation_hmix.shape[0]) * torch.sum(torch.square(
                 (self.hmix_measurements - simulation_hmix) / self.hmix_denominator))
         else:
-            hmix_objective = 0
+            hmix_objective = torch.tensor([0])
         objective = density_objective + hvap_objective + hmix_objective
-        return objective.item()
+        if debug is True:
+            return [objective.item(), density_objective.item(), hvap_objective.item(), hmix_objective.item()]
+        else:
+            return objective.item()
 
     def surrogate_avg_uncertainty(self, parameters):
         surrogate_predictions, surrogate_uncertainties = self.evaluate_parameter_set_multisurrogate(
