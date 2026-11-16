@@ -158,8 +158,15 @@ class SimulatedDataset:
         return mses
 
     def remove_problematic_points(self):
-        self.df = self.df[(self.df['Component 1'] != 'CC(=O)CC(C)C') & (self.df['Component 2'] != 'CCCCCCO')]
-        # self.df = self.df[(self.df['Property Type'] != 'openff.evaluator.properties.enthalpy.EnthalpyOfVaporization' & self.df['Category 1'] != 'Carboxylic Acid')]
+        # Component order must not affect binary mixture selection.
+        # Preserve the historical pure-compound policy: exclude the ketone,
+        # retain pure hexanol. A different pure policy is a separate decision.
+        mixture = self.df['N Components'] > 1
+        components = self.df[['Component 1', 'Component 2']]
+        problematic_mixture = components.isin(['CC(=O)CC(C)C', 'CCCCCCO']).any(axis=1)
+        problematic_pure = self.df['Component 1'].eq('CC(=O)CC(C)C')
+        self.df = self.df[~((mixture & problematic_mixture) |
+                           (~mixture & problematic_pure))]
 
     def plot_parity(self, dataframe, property, category):
         rmse = np.sqrt(np.mean(np.square(dataframe['Reference Value'] - dataframe['Estimated Value'])))
